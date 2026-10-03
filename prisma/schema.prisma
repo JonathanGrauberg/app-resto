@@ -1,0 +1,569 @@
+// app-resto — esquema multi-tenant.
+// Regla: toda tabla de negocio lleva `tenantId` y se consulta siempre filtrando por él
+// (ver src/lib/tenant-db.ts).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────
+// Plataforma / tenants
+// ─────────────────────────────────────────────────────────────
+
+enum ModuleKey {
+  CARTA_QR
+  PEDIDOS
+  KDS
+  CAJA
+  RESERVAS
+  BI
+  MULTI_IDIOMA
+}
+
+model Tenant {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  settings       TenantSettings?
+  modules        TenantModule[]
+  memberships    Membership[]
+  areas          Area[]
+  tables         Table[]
+  tableGroups    TableGroup[]
+  sessions       TableSession[]
+  categories     Category[]
+  products       Product[]
+  orders         Order[]
+  orderItems     OrderItem[]
+  reservations   Reservation[]
+  events         Event[]
+  notifications  Notification[]
+  translations   Translation[]
+  modifierGroups ModifierGroup[]
+  cartItems      CartItem[]
+}
+
+enum MenuTheme {
+  SYSTEM
+  DARK
+  LIGHT
+}
+
+model TenantSettings {
+  tenantId        String    @id
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tagline         String?
+  description     String?
+  coverImageUrl   String?
+  logoUrl         String?
+  /// Imagen al compartir el enlace (WhatsApp, redes). Si falta: portada → logo.
+  shareImageUrl   String?
+  address         String?
+  phone           String?
+  instagramUrl    String?
+  facebookUrl     String?
+  websiteUrl      String?
+  googleReviewUrl String?
+  currency        String    @default("EUR")
+  locale          String    @default("es-ES")
+  timezone        String    @default("Europe/Madrid")
+  /// Tema por defecto de la carta pública (el comensal puede cambiarlo).
+  menuTheme       MenuTheme @default(DARK)
+  /// Idiomas adicionales que el tenant decide cargar a mano (ej. ["en","ca"]).
+  extraLocales    String[]  @default([])
+  /// Horarios de apertura, JSON libre por día: { "mon": [["12:00","16:00"]], ... }
+  openingHours    Json?
+}
+
+model TenantModule {
+  tenantId  String
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  module    ModuleKey
+  enabled   Boolean   @default(true)
+  expiresAt DateTime?
+
+  @@id([tenantId, module])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Usuarios y roles
+// ─────────────────────────────────────────────────────────────
+
+enum Role {
+  OWNER
+  ADMIN
+  CAJA
+  MOZO
+  COCINA
+  BAR
+}
+
+model User {
+  id              String   @id @default(cuid())
+  email           String?  @unique
+  name            String
+  passwordHash    String?
+  isPlatformAdmin Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  memberships Membership[]
+  sessions    AuthSession[]
+}
+
+/// Pertenencia de un usuario a un tenant con un rol. El PIN es por tenant.
+model Membership {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role
+  pinHash   String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  tableSessions  TableSession[]
+  ordersCreated  Order[]        @relation("OrderCreatedBy")
+  ordersAccepted Order[]        @relation("OrderAcceptedBy")
+
+  @@unique([tenantId, userId])
+  @@index([tenantId, role])
+}
+
+model AuthSession {
+  id           String   @id @default(cuid())
+  tokenHash    String   @unique
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Tenant activo de la sesión (null = panel de plataforma).
+  tenantId     String?
+  membershipId String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Salones y mesas
+// ─────────────────────────────────────────────────────────────
+
+model Area {
+  id        String @id @default(cuid())
+  tenantId  String
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  sortOrder Int    @default(0)
+  /// Tamaño del lienzo del plano (unidades de grilla).
+  width     Int    @default(20)
+  height    Int    @default(12)
+
+  tables Table[]
+
+  @@index([tenantId])
+}
+
+enum TableShape {
+  SQUARE
+  ROUND
+  RECT
+}
+
+enum TableStatus {
+  FREE
+  OCCUPIED
+  PENDING_PAYMENT
+  DISABLED
+}
+
+model Table {
+  id         String      @id @default(cuid())
+  tenantId   String
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  areaId     String
+  area       Area        @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  number     String
+  seats      Int         @default(4)
+  maxGuests  Int         @default(4)
+  shape      TableShape  @default(SQUARE)
+  posX       Int         @default(0)
+  posY       Int         @default(0)
+  width      Int         @default(2)
+  height     Int         @default(2)
+  status     TableStatus @default(FREE)
+  /// Token aleatorio del QR; regenerable. Nunca usar el id en la URL pública.
+  qrToken    String      @unique
+  groupId    String?
+  group      TableGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  /// Mesa extra agregada durante el servicio (traída del depósito, etc.).
+  /// Se elimina sola cuando se cobra la mesa a la que estaba unida.
+  temporary  Boolean     @default(false)
+  /// Mesa retirada (ej. extra ya cobrada). No aparece en plano ni sala; se conserva para el historial.
+  archivedAt DateTime?
+
+  sessions     TableSession[]
+  reservations ReservationTable[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, areaId])
+}
+
+/// Mesas unidas temporalmente (comparten sesión y cuenta).
+model TableGroup {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  tables Table[]
+
+  @@index([tenantId])
+}
+
+enum SessionStatus {
+  OPEN
+  PENDING_PAYMENT
+  CLOSED
+}
+
+/// Una ocupación de mesa: desde que se abre hasta que caja confirma el cobro.
+model TableSession {
+  id                String        @id @default(cuid())
+  tenantId          String
+  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tableId           String
+  table             Table         @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  waiterId          String?
+  waiter            Membership?   @relation(fields: [waiterId], references: [id], onDelete: SetNull)
+  guests            Int           @default(1)
+  status            SessionStatus @default(OPEN)
+  openedAt          DateTime      @default(now())
+  closeRequestedAt  DateTime?
+  closedAt          DateTime?
+  /// Total de la pre-cuenta al cerrar (céntimos). Para BI.
+  totalCents        Int?
+  reviewPromptShown Boolean       @default(false)
+  waiterCalledAt    DateTime?
+
+  orders    Order[]
+  cartItems CartItem[]
+
+  @@index([tenantId, status])
+  @@index([tableId, status])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Carta
+// ─────────────────────────────────────────────────────────────
+
+enum PrepStation {
+  KITCHEN
+  BAR
+  NONE
+}
+
+/// 14 alérgenos de declaración obligatoria (Reglamento UE 1169/2011).
+enum Allergen {
+  GLUTEN
+  CRUSTACEANS
+  EGGS
+  FISH
+  PEANUTS
+  SOY
+  MILK
+  NUTS
+  CELERY
+  MUSTARD
+  SESAME
+  SULPHITES
+  LUPIN
+  MOLLUSCS
+}
+
+model Category {
+  id          String  @id @default(cuid())
+  tenantId    String
+  tenant      Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  sortOrder   Int     @default(0)
+  visible     Boolean @default(true)
+
+  products Product[]
+
+  @@index([tenantId, sortOrder])
+}
+
+model Product {
+  id          String      @id @default(cuid())
+  tenantId    String
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  categoryId  String
+  category    Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  priceCents  Int
+  imageUrl    String?
+  station     PrepStation @default(KITCHEN)
+  allergens   Allergen[]  @default([])
+  /// Etiquetas libres: vegano, picante, sin gluten, nuevo...
+  tags        String[]    @default([])
+  available   Boolean     @default(true)
+  visible     Boolean     @default(true)
+  sortOrder   Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  modifierGroups ProductModifierGroup[]
+  orderItems     OrderItem[]
+  ownGroup       ModifierGroup?         @relation("ProductOwnGroup")
+  cartItems      CartItem[]
+
+  @@index([tenantId, categoryId, sortOrder])
+}
+
+/// Grupo de opciones ("Punto de la carne", "Extras").
+/// Compartido entre productos, o propio de un plato si tiene `ownerProductId`
+/// (los "Extras de este plato" que se cargan desde la ficha del producto).
+model ModifierGroup {
+  id             String   @id @default(cuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name           String
+  minSelect      Int      @default(0)
+  maxSelect      Int      @default(1)
+  ownerProductId String?  @unique
+  ownerProduct   Product? @relation("ProductOwnGroup", fields: [ownerProductId], references: [id], onDelete: Cascade)
+
+  options  ModifierOption[]
+  products ProductModifierGroup[]
+
+  @@index([tenantId])
+}
+
+model ModifierOption {
+  id              String        @id @default(cuid())
+  groupId         String
+  group           ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  name            String
+  extraPriceCents Int           @default(0)
+  sortOrder       Int           @default(0)
+}
+
+model ProductModifierGroup {
+  productId String
+  product   Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  groupId   String
+  group     ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  sortOrder Int           @default(0)
+
+  @@id([productId, groupId])
+}
+
+/// Traducciones opcionales cargadas por el tenant.
+model Translation {
+  id         String @id @default(cuid())
+  tenantId   String
+  tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  entityType String // "Product" | "Category" | "ModifierOption" ...
+  entityId   String
+  field      String // "name" | "description"
+  locale     String
+  text       String
+
+  @@unique([entityType, entityId, field, locale])
+  @@index([tenantId, locale])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Carrito compartido y pedidos
+// ─────────────────────────────────────────────────────────────
+
+/// Ítem del carrito compartido de la mesa (antes de enviar).
+model CartItem {
+  id        String       @id @default(cuid())
+  tenantId  String
+  tenant    Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sessionId String
+  session   TableSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int          @default(1)
+  /// [{ groupId, optionId, name, extraPriceCents }]
+  modifiers Json         @default("[]")
+  notes     String?
+  /// Apodo del comensal que lo agregó ("Ana", "Comensal 2").
+  addedBy   String?
+  createdAt DateTime     @default(now())
+
+  @@index([sessionId])
+}
+
+enum OrderStatus {
+  PENDING // enviado por la mesa, esperando validación del mozo
+  ACCEPTED // validado, repartido a cocina/bar
+  REJECTED
+  COMPLETED // todos los ítems entregados
+}
+
+enum OrderSource {
+  GUEST
+  STAFF
+}
+
+/// Una ronda de pedido dentro de la sesión de mesa.
+model Order {
+  id           String       @id @default(cuid())
+  tenantId     String
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sessionId    String
+  session      TableSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  round        Int
+  status       OrderStatus  @default(PENDING)
+  source       OrderSource  @default(GUEST)
+  createdById  String?
+  createdBy    Membership?  @relation("OrderCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  acceptedById String?
+  acceptedBy   Membership?  @relation("OrderAcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
+  rejectReason String?
+  createdAt    DateTime     @default(now())
+  acceptedAt   DateTime?
+
+  items OrderItem[]
+
+  @@unique([sessionId, round])
+  @@index([tenantId, status])
+}
+
+enum ItemStatus {
+  PENDING
+  IN_PREPARATION
+  READY
+  DELIVERED
+  CANCELLED
+}
+
+model OrderItem {
+  id             String      @id @default(cuid())
+  tenantId       String
+  tenant         Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orderId        String
+  order          Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId      String?
+  product        Product?    @relation(fields: [productId], references: [id], onDelete: SetNull)
+  /// Copia del nombre y precio al momento del pedido (la carta puede cambiar).
+  name           String
+  unitPriceCents Int
+  quantity       Int
+  modifiers      Json        @default("[]")
+  notes          String?
+  station        PrepStation
+  status         ItemStatus  @default(PENDING)
+  readyAt        DateTime?
+  deliveredAt    DateTime?
+
+  @@index([tenantId, station, status])
+  @@index([orderId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Reservas y eventos
+// ─────────────────────────────────────────────────────────────
+
+enum ReservationStatus {
+  CONFIRMED
+  SEATED
+  NO_SHOW
+  CANCELLED
+  COMPLETED
+}
+
+model Reservation {
+  id            String            @id @default(cuid())
+  tenantId      String
+  tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customerName  String
+  customerPhone String?
+  customerEmail String?
+  partySize     Int
+  startsAt      DateTime
+  endsAt        DateTime
+  status        ReservationStatus @default(CONFIRMED)
+  notes         String?
+  eventId       String?
+  event         Event?            @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  createdAt     DateTime          @default(now())
+
+  tables ReservationTable[]
+
+  @@index([tenantId, startsAt])
+}
+
+/// Mesa asignada a una reserva. Una exclusión en SQL (migración manual) impide
+/// que la misma mesa tenga dos reservas activas con horarios solapados.
+model ReservationTable {
+  reservationId String
+  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  tableId       String
+  table         Table       @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  startsAt      DateTime
+  endsAt        DateTime
+  active        Boolean     @default(true)
+
+  @@id([reservationId, tableId])
+  @@index([tableId, startsAt])
+}
+
+model Event {
+  id       String   @id @default(cuid())
+  tenantId String
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name     String
+  startsAt DateTime
+  endsAt   DateTime
+  notes    String?
+
+  reservations Reservation[]
+
+  @@index([tenantId, startsAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Notificaciones
+// ─────────────────────────────────────────────────────────────
+
+enum NotificationType {
+  ORDER_NO_WAITER
+  ORDER_PENDING
+  ORDER_ACCEPTED
+  ITEM_READY
+  WAITER_CALLED
+  TABLE_CLOSE_REQUESTED
+}
+
+model Notification {
+  id                 String           @id @default(cuid())
+  tenantId           String
+  tenant             Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type               NotificationType
+  /// Rol destinatario (null = todos) y/o membresía puntual.
+  targetRole         Role?
+  targetMembershipId String?
+  tableId            String?
+  sessionId          String?
+  orderId            String?
+  message            String
+  readAt             DateTime?
+  createdAt          DateTime         @default(now())
+
+  @@index([tenantId, createdAt])
+}

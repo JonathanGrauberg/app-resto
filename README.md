@@ -1,36 +1,52 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# app-resto
 
-## Getting Started
+SaaS multi-tenant para restaurantes, bares y restobares (mercado inicial: España).
+Carta QR, pedidos, sala, cocina/bar, caja, reservas y métricas. Nombre provisorio.
 
-First, run the development server:
+Roadmap y arquitectura: [docs/ROADMAP.md](docs/ROADMAP.md).
+
+## Stack
+
+Next.js 16 (App Router) · React 19 · Tailwind CSS 4 · Prisma 7 · PostgreSQL · Zod · Vitest
+
+## Desarrollo local
+
+Requisitos: Node 20.9+ (probado con Node 24).
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run db:start      # Postgres local aislado (prisma dev), no usa ninguna base existente
+npm run db:migrate    # aplica migraciones
+npm run db:seed       # carga el local de demo "La Casona"
+npx next dev -p 3100  # http://localhost:3100
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+> El puerto 3000 suele estar ocupado por otro proyecto: usamos el 3100.
+> Si cambiás `prisma/schema.prisma`, reiniciá el servidor de desarrollo
+> (el cliente de Prisma queda en memoria entre recargas).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Credenciales de prueba: ver el encabezado de [prisma/seed.ts](prisma/seed.ts).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| URL | Qué es |
+| --- | --- |
+| `/la-casona` | Carta pública |
+| `/la-casona/m/<qr>` | Carta desde el QR de una mesa (enlaces en Admin → Mesas) |
+| `/login` | Panel (dueño, admin, caja) |
+| `/login/pin/la-casona` | Personal con PIN (mozo, cocina, bar) |
+| `/platform` | Panel de la plataforma (alta de locales y módulos) |
 
-## Learn More
+## Scripts
 
-To learn more about Next.js, take a look at the following resources:
+| Script | |
+| --- | --- |
+| `npm test` | Tests (incluye aislamiento entre tenants; requiere la base levantada) |
+| `npm run typecheck` / `npm run lint` | Verificación estática |
+| `npm run db:studio` | Explorar la base |
+| `npm run db:reset` | Borra y recrea la base local |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Reglas del proyecto
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Multi-tenant**: toda consulta de negocio usa `tenantDb(tenantId)` (`src/lib/tenant-db.ts`), que fuerza el `tenantId`. El cliente `db` crudo solo para auth, plataforma y resolución por slug.
+- **Autorización** en cada página y Server Action (`src/lib/auth/guards.ts`); el `proxy.ts` es solo un chequeo optimista.
+- **Formularios**: `useFormAction` (`src/lib/use-form-action.ts`) para no perder lo escrito si falla la validación.
+- **Imágenes**: siempre con degradado hacia el fondo (`MockImage` / `FadedImage`), negro en oscuro y blanco en claro.

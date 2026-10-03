@@ -1,26 +1,141 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* `dark:` = tema oscuro forzado, o del sistema si el usuario no eligió claro. */
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
+      @slot;
+    }
   }
 }
 
+/*
+ * Tokens de diseño (provisorios hasta definir branding).
+ * Claro por defecto; oscuro según el sistema o forzado con <html data-theme="dark">.
+ * Los degradados de imágenes usan `--bg`, así que en oscuro funden a negro y en claro a blanco.
+ */
+:root {
+  --bg: #fbfaf7;
+  --surface: #ffffff;
+  --ink: #1a1714;
+  --muted: #736b62;
+  --line: #e8e3dc;
+  --brand: #9a6b1f;
+  --brand-ink: #ffffff;
+  --brand-soft: #f6eedf;
+  --ok: #15803d;
+  --ok-soft: #dcfce7;
+  --warn: #b45309;
+  --warn-soft: #fef3c7;
+  --danger: #b91c1c;
+  --danger-soft: #fee2e2;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b0a09;
+    --surface: #171512;
+    --ink: #f5f2ed;
+    --muted: #a39b91;
+    --line: #2a2622;
+    --brand: #e2bd7a;
+    --brand-ink: #17130d;
+    --brand-soft: #2b2316;
+    --ok: #4ade80;
+    --ok-soft: #12291a;
+    --warn: #fbbf24;
+    --warn-soft: #2d2410;
+    --danger: #f87171;
+    --danger-soft: #2f1414;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0b0a09;
+  --surface: #171512;
+  --ink: #f5f2ed;
+  --muted: #a39b91;
+  --line: #2a2622;
+  --brand: #e2bd7a;
+  --brand-ink: #17130d;
+  --brand-soft: #2b2316;
+  --ok: #4ade80;
+  --ok-soft: #12291a;
+  --warn: #fbbf24;
+  --warn-soft: #2d2410;
+  --danger: #f87171;
+  --danger-soft: #2f1414;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-soft: var(--brand-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --animate-fade-up: fade-up 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-progress: progress var(--hero-interval, 7s) linear both;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes progress {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* Al imprimir con un diálogo de QR abierto, se imprime solo ese diálogo. */
+@media print {
+  body:has(> [data-print-only]) > :not([data-print-only]) {
+    display: none !important;
+  }
 }
