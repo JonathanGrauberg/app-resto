@@ -7,6 +7,7 @@ import {
   ExternalLink,
   Link2,
   Minus,
+  NotebookPen,
   Plus,
   Printer,
   QrCode,
@@ -18,6 +19,8 @@ import {
 } from "lucide-react";
 import { QrDialog } from "@/components/qr-dialog";
 import { OrdersSection } from "./orders-section";
+import { StaffOrderComposer } from "./staff-order";
+import type { PublicMenu } from "@/lib/public-menu";
 import { STATUS_STYLE } from "@/components/table-map";
 import { cn } from "@/lib/format";
 import type { SalaSession, SalaTable } from "@/lib/sala";
@@ -44,6 +47,7 @@ export function TablePanel({
   session,
   areaName,
   areaId,
+  menu,
   waiters,
   me,
   now,
@@ -57,6 +61,7 @@ export function TablePanel({
   session: SalaSession | null;
   areaName: string;
   areaId: string;
+  menu: PublicMenu;
   waiters: { id: string; name: string }[];
   me: Me;
   now: number | null;
@@ -69,6 +74,11 @@ export function TablePanel({
   const [msg, setMsg] = useState<{ ok?: string; error?: string } | null>(null);
   const [showQr, setShowQr] = useState(false);
   const [extraSeats, setExtraSeats] = useState<number | null>(null);
+  const [composing, setComposing] = useState(false);
+  // Nombres que ya pidieron en la mesa, para cargar "para quién" con un toque.
+  const knownNames = [
+    ...new Set(session?.orders.flatMap((o) => o.items.map((i) => i.addedBy)).filter((n): n is string => !!n) ?? []),
+  ];
   const seats = members.reduce((n, m) => n + m.seats, 0);
   const capacity = members.reduce((n, m) => n + m.maxGuests, 0);
   const [guests, setGuestsLocal] = useState(session?.guests ?? seats);
@@ -220,6 +230,16 @@ export function TablePanel({
                 Ya fui
               </button>
             </section>
+          )}
+
+          {/* Tomar pedido (mesa sin celular) */}
+          {session?.status === "OPEN" && (
+            <button
+              onClick={() => setComposing(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3 font-semibold text-brand-ink"
+            >
+              <NotebookPen className="size-5" aria-hidden /> Tomar pedido
+            </button>
           )}
 
           {/* Pedidos */}
@@ -380,6 +400,20 @@ export function TablePanel({
 
       {msg?.error && <p className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{msg.error}</p>}
       {msg?.ok && <p className="rounded-lg bg-ok-soft px-3 py-2 text-sm text-ok">{msg.ok}</p>}
+
+      {composing && session && (
+        <StaffOrderComposer
+          sessionId={session.id}
+          tableTitle={title}
+          menu={menu}
+          knownNames={knownNames}
+          onClose={() => setComposing(false)}
+          onDone={() => {
+            setMsg({ ok: "Pedido enviado a cocina" });
+            onDone();
+          }}
+        />
+      )}
 
       {showQr && (
         <QrDialog

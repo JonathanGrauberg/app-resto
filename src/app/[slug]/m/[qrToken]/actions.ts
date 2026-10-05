@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { ActionState } from "@/lib/actions";
 import { defaultNickname, newDinerId, setDinerCookie } from "@/lib/diner";
+import { buildModifiers, unitPrice } from "@/lib/order-lines";
 import { notifyStaff, notifyTable } from "@/lib/realtime/server";
 import { currentDiner, tableContext, type TableContext } from "@/lib/table-session";
 
@@ -105,16 +106,9 @@ export async function addToCart(slug: string, qrToken: string, input: z.input<ty
   if (!product.available) return err(`${product.name} está agotado`);
 
   // Validar opciones: deben ser de los grupos del plato y respetar mínimos/máximos.
-  const modifiers: { groupId: string; groupName: string; optionId: string; name: string; extraPriceCents: number }[] = [];
-  for (const { group } of product.modifierGroups) {
-    const chosen = group.options.filter((o) => optionIds.includes(o.id));
-    if (chosen.length < group.minSelect) return err(`Elegí ${group.name.toLowerCase()}`);
-    if (chosen.length > group.maxSelect) return err(`En ${group.name.toLowerCase()} podés elegir hasta ${group.maxSelect}`);
-    for (const o of chosen) {
-      modifiers.push({ groupId: group.id, groupName: group.name, optionId: o.id, name: o.name, extraPriceCents: o.extraPriceCents });
-    }
-  }
-  if (modifiers.length !== new Set(optionIds).size) return err("Opción no válida");
+  const built = buildModifiers(product.modifierGroups.map((m) => m.group), optionIds);
+  if ("error" in built) return err(built.error);
+  const { modifiers } = built;
 
   await ctx.tdb.cartItem.create({
     data: {
@@ -190,7 +184,7 @@ export async function submitOrder(slug: string, qrToken: string): Promise<Result
               productId: c.productId,
               // Copia de nombre y precio al momento del pedido (la carta puede cambiar después).
               name: c.product.name,
-              unitPriceCents: c.product.priceCents + mods.reduce((n, m) => n + m.extraPriceCents, 0),
+              unitPriceCents: unitPrice(c.product.priceCents, mods),
               quantity: c.quantity,
               modifiers: mods,
               notes: c.notes,

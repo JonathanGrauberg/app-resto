@@ -5,6 +5,7 @@ import { useMemo, useState, useTransition } from "react";
 import { BellRing, Link2, Plus, Users, X } from "lucide-react";
 import { STATUS_STYLE, TableLegend } from "@/components/table-map";
 import { cn } from "@/lib/format";
+import type { PublicMenu } from "@/lib/public-menu";
 import type { SalaData, SalaTable } from "@/lib/sala";
 import { addExtraTable, joinTables } from "@/app/staff/sala-actions";
 import { TablePanel } from "./table-panel";
@@ -15,11 +16,14 @@ export function SalaView({
   me,
   slug,
   venue,
+  menu,
 }: {
   data: SalaData;
   me: Me;
   slug: string;
   venue: string;
+  /** Carta, para que el mozo tome pedidos desde el panel de la mesa. */
+  menu: PublicMenu;
 }) {
   const router = useRouter();
   const now = useNow();
@@ -384,6 +388,7 @@ export function SalaView({
                 slug={slug}
                 venue={venue}
                 areaId={data.areas.find((a) => a.tables.some((t) => t.id === selected.id))?.id ?? area.id}
+                menu={menu}
                 onJoin={() => startJoinMode(selected)}
                 onDone={() => router.refresh()}
               />

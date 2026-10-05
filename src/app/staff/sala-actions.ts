@@ -2,11 +2,12 @@
 
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import type { Role } from "@/generated/prisma/enums";
+import type { PrepStation, Role } from "@/generated/prisma/enums";
 import type { ActionState } from "@/lib/actions";
 import { requireTenantRole } from "@/lib/auth/guards";
 import { CAN_MANAGE_TABLES } from "@/lib/auth/permissions";
 import { notifyStaff, notifyTable } from "@/lib/realtime/server";
+import { buildModifiers, unitPrice, type Modifier } from "@/lib/order-lines";
 import { ensureReceipt } from "@/lib/receipt";
 import { tableLabelOf } from "@/lib/table-session";
 import type { TenantDb } from "@/lib/tenant-db";
@@ -435,4 +436,105 @@ export async function dismissCall(sessionId: string): Promise<ActionState> {
   await tdb.tableSession.update({ where: { id: sessionId }, data: { waiterCalledAt: null } });
   await refresh(tenant.id, sessionId);
   return ok("Llamada atendida");
+}
+
+// ─────────────────────────────────────────────────────────────
+// Pedido cargado por el mozo (mesa sin celular, o que prefiere pedirle al mozo)
+// ─────────────────────────────────────────────────────────────
+
+export type StaffOrderLine = {
+  productId: string;
+  quantity: number;
+  optionIds: string[];
+  notes?: string;
+  /** Para quién es (apodo); vacío = "Mesa". */
+  who?: string;
+};
+
+/** Entra ya aceptado: va directo a cocina/bar. Precios y opciones se validan contra la carta. */
+export async function createStaffOrder(sessionId: string, lines: StaffOrderLine[]): Promise<ActionState> {
+  const { tdb, tenant, membership } = await auth();
+  if (!Array.isArray(lines) || lines.length === 0) return err("El pedido está vacío");
+  if (lines.length > 60) return err("Demasiadas líneas en un solo pedido");
+
+  const session = await tdb.tableSession.findUnique({ where: { id: sessionId }, include: { table: true } });
+  if (!session || session.status === "CLOSED") return err("La mesa no está abierta");
+  if (session.status === "PENDING_PAYMENT") return err("La mesa está por cobrarse: reabrila para sumar pedidos");
+
+  const products = await tdb.product.findMany({
+    where: { id: { in: [...new Set(lines.map((l) => l.productId))] } },
+    include: { modifierGroups: { include: { group: { include: { options: true } } } } },
+  });
+
+  const items: {
+    tenantId: string;
+    productId: string;
+    name: string;
+    unitPriceCents: number;
+    quantity: number;
+    modifiers: Modifier[];
+    notes: string | null;
+    station: PrepStation;
+    status: "READY" | "PENDING";
+    readyAt: Date | null;
+    addedBy: string | null;
+    addedById: string | null;
+  }[] = [];
+  for (const l of lines) {
+    const product = products.find((p) => p.id === l.productId);
+    if (!product) return err("Hay un plato que ya no está en la carta");
+    if (!product.available) return err(`${product.name} está agotado`);
+    const qty = Math.round(l.quantity);
+    if (!(qty >= 1 && qty <= 50)) return err("Cantidad no válida");
+    const built = buildModifiers(product.modifierGroups.map((m) => m.group), l.optionIds ?? []);
+    if ("error" in built) return err(`${product.name}: ${built.error}`);
+    const who = (l.who ?? "").trim().slice(0, 20);
+    items.push({
+      tenantId: tenant.id,
+      productId: product.id,
+      name: product.name,
+      unitPriceCents: unitPrice(product.priceCents, built.modifiers),
+      quantity: qty,
+      modifiers: built.modifiers,
+      notes: (l.notes ?? "").trim().slice(0, 140) || null,
+      station: product.station,
+      // Lo que no se prepara queda listo para que el mozo lo lleve.
+      status: product.station === "NONE" ? ("READY" as const) : ("PENDING" as const),
+      readyAt: product.station === "NONE" ? new Date() : null,
+      // Mismo "id" para el mismo nombre dentro de la mesa: así el consumo por persona agrupa bien.
+      addedBy: who || null,
+      addedById: who ? `mozo:${who.toLowerCase()}` : null,
+    });
+  }
+
+  const order = await tdb.$transaction(async (tx) => {
+    const last = await tx.order.findFirst({ where: { sessionId }, orderBy: { round: "desc" } });
+    const created = await tx.order.create({
+      data: {
+        tenantId: tenant.id,
+        sessionId,
+        round: (last?.round ?? 0) + 1,
+        status: "ACCEPTED",
+        source: "STAFF",
+        createdById: membership.id,
+        acceptedById: membership.id,
+        acceptedAt: new Date(),
+        items: { create: items },
+      },
+    });
+    // Si la mesa no tenía mozo y lo carga un mozo, queda a su cargo.
+    if (!session.waiterId && membership.role === "MOZO") {
+      await tx.tableSession.update({ where: { id: sessionId }, data: { waiterId: membership.id } });
+    }
+    return created;
+  });
+
+  const label = await tableLabelOf(tdb, session.table);
+  const stations = [...new Set(items.map((i) => i.station))].filter((s): s is "KITCHEN" | "BAR" => s !== "NONE");
+  if (stations.length) await notifyStaff(tenant.id, { type: "kitchen.new", tableLabel: label, stations });
+  await notifyStaff(tenant.id, { type: "order.updated", sessionId, orderId: order.id });
+  await notifyTable(tenant.id, sessionId, { type: "order", orderId: order.id });
+  revalidatePath("/staff", "layout");
+  revalidatePath("/admin", "layout");
+  return ok(stations.length ? "Pedido enviado a cocina" : "Pedido cargado");
 }

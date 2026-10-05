@@ -6,6 +6,7 @@ import { ClosedToday } from "@/components/sala/closed-today";
 import { SalaView } from "@/components/sala/sala-view";
 import { TableLegend } from "@/components/table-map";
 import { requireTenantRole } from "@/lib/auth/guards";
+import { getPublicMenu } from "@/lib/public-menu";
 import { ADMIN_ROLES } from "@/lib/auth/permissions";
 import { cn } from "@/lib/format";
 import { getClosedToday, getSalaData } from "@/lib/sala";
@@ -47,7 +48,7 @@ export default async function AdminMesasPage({ searchParams }: PageProps<"/admin
   );
 
   if (live) {
-    const [data, closed] = await Promise.all([getSalaData(tdb), getClosedToday(tdb)]);
+    const [data, closed, menu] = await Promise.all([getSalaData(tdb), getClosedToday(tdb), getPublicMenu(tenant.id)]);
     return (
       <>
         <PageHeader title="Salones y mesas" description="Operación en vivo: lo mismo que ven mozos y caja." />
@@ -57,6 +58,7 @@ export default async function AdminMesasPage({ searchParams }: PageProps<"/admin
           me={{ membershipId: membership.id, role: membership.role }}
           slug={tenant.slug}
           venue={tenant.name}
+          menu={menu}
         />
         <ClosedToday rows={closed} />
       </>
