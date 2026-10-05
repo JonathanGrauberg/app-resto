@@ -30,9 +30,18 @@ export function SplitBill({ receipt: r }: { receipt: Receipt }) {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-baseline justify-between rounded-2xl bg-surface p-4 ring-1 ring-line">
-        <span className="text-sm text-muted">Total de la mesa</span>
-        <span className="text-3xl font-bold tabular-nums">{formatPrice(r.totalCents)}</span>
+      <div className="rounded-2xl bg-surface p-4 ring-1 ring-line">
+        <div className="flex items-baseline justify-between">
+          <span className="text-sm text-muted">Total de la mesa</span>
+          <span className="text-3xl font-bold tabular-nums">{formatPrice(r.totalCents)}</span>
+        </div>
+        {(r.compsCents > 0 || r.discountCents > 0) && (
+          <p className="mt-1 text-right text-xs text-muted">
+            {r.compsCents > 0 && `Invitación de la casa −${formatPrice(r.compsCents)}`}
+            {r.compsCents > 0 && r.discountCents > 0 && " · "}
+            {r.discountCents > 0 && `Descuento −${formatPrice(r.discountCents)}`}
+          </p>
+        )}
       </div>
 
       <div className="flex rounded-xl bg-ink/5 p-1" role="tablist" aria-label="Cómo dividir">
@@ -74,6 +83,11 @@ export function SplitBill({ receipt: r }: { receipt: Receipt }) {
               </ul>
             </details>
           ))}
+          {r.discountCents > 0 && (
+            <p className="rounded-xl bg-brand-soft px-3 py-2 text-xs">
+              Hay un descuento de {formatPrice(r.discountCents)} sobre el total: podés repartirlo entre todos.
+            </p>
+          )}
           <p className="text-xs text-muted">
             Tocá un nombre para ver el detalle. Lo que cargó el mozo figura como &ldquo;Mesa&rdquo;; si algo fue para compartir,
             podés usar &ldquo;Partes iguales&rdquo; para esa parte.
@@ -123,7 +137,7 @@ export function SplitBill({ receipt: r }: { receipt: Receipt }) {
                   {[...l.modifiers, l.people.join(", ")].filter(Boolean).join(" · ")}
                 </span>
               </span>
-              <span className="shrink-0 tabular-nums">{formatPrice(l.totalCents)}</span>
+              <span className="shrink-0 tabular-nums">{l.comped ? "Invita la casa" : formatPrice(l.totalCents)}</span>
             </li>
           ))}
         </ul>

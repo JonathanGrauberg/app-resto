@@ -14,11 +14,13 @@ import {
   SquarePlus,
   Trash2,
   Unlink,
+  Wallet,
   UserCheck,
   UserMinus,
 } from "lucide-react";
 import { QrDialog } from "@/components/qr-dialog";
 import { OrdersSection } from "./orders-section";
+import { CheckoutDialog } from "./checkout";
 import { StaffOrderComposer } from "./staff-order";
 import type { PublicMenu } from "@/lib/public-menu";
 import { STATUS_STYLE } from "@/components/table-map";
@@ -27,7 +29,6 @@ import type { SalaSession, SalaTable } from "@/lib/sala";
 import {
   addExtraTable,
   assignWaiter,
-  confirmPayment,
   dismissCall,
   openTable,
   releaseTable,
@@ -75,6 +76,7 @@ export function TablePanel({
   const [showQr, setShowQr] = useState(false);
   const [extraSeats, setExtraSeats] = useState<number | null>(null);
   const [composing, setComposing] = useState(false);
+  const [paying, setPaying] = useState(false);
   // Nombres que ya pidieron en la mesa, para cargar "para quién" con un toque.
   const knownNames = [
     ...new Set(session?.orders.flatMap((o) => o.items.map((i) => i.addedBy)).filter((n): n is string => !!n) ?? []),
@@ -268,6 +270,15 @@ export function TablePanel({
               >
                 Cerrar mesa y pasar a cobrar
               </button>
+              {isCashier && (
+                <button
+                  onClick={() => setPaying(true)}
+                  disabled={pending}
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-ok/50 text-sm font-semibold text-ok hover:bg-ok-soft"
+                >
+                  <Wallet className="size-4" aria-hidden /> Cobrar ahora (paga en caja)
+                </button>
+              )}
               <button
                 onClick={() => {
                   if (confirm("¿Liberar la mesa sin consumo? (por ejemplo, se abrió por error o se fueron)")) {
@@ -289,11 +300,11 @@ export function TablePanel({
               </p>
               {isCashier && (
                 <button
-                  onClick={() => run(() => confirmPayment(session.id))}
+                  onClick={() => setPaying(true)}
                   disabled={pending}
-                  className="h-12 w-full rounded-xl bg-ok font-semibold text-white disabled:opacity-50"
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-ok font-semibold text-white disabled:opacity-50"
                 >
-                  Confirmar cobro y liberar mesa
+                  <Wallet className="size-5" aria-hidden /> Cobrar
                 </button>
               )}
               <button
@@ -400,6 +411,18 @@ export function TablePanel({
 
       {msg?.error && <p className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{msg.error}</p>}
       {msg?.ok && <p className="rounded-lg bg-ok-soft px-3 py-2 text-sm text-ok">{msg.ok}</p>}
+
+      {paying && session && (
+        <CheckoutDialog
+          sessionId={session.id}
+          title={title}
+          onClose={() => setPaying(false)}
+          onDone={() => {
+            setMsg({ ok: "Cobrado. Mesa libre." });
+            onDone();
+          }}
+        />
+      )}
 
       {composing && session && (
         <StaffOrderComposer

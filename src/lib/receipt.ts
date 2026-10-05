@@ -35,6 +35,7 @@ const sessionInclude = {
     orderBy: { round: "asc" as const },
     include: { items: { where: { status: { not: "CANCELLED" as const } }, orderBy: { id: "asc" as const } } },
   },
+  payments: { orderBy: { createdAt: "asc" as const } },
 };
 
 type LoadedSession = NonNullable<Awaited<ReturnType<typeof loadForStaff>>>;
@@ -54,7 +55,10 @@ function build(s: LoadedSession, tenant: { name: string; slug: string }, setting
         name: i.name,
         quantity: i.quantity,
         unitCents: i.unitPriceCents,
-        totalCents: i.unitPriceCents * i.quantity,
+        // Invitación de la casa: no suma.
+        totalCents: i.comped ? 0 : i.unitPriceCents * i.quantity,
+        listCents: i.unitPriceCents * i.quantity,
+        comped: i.comped,
         modifiers: mods,
         addedBy: i.addedBy,
         addedById: i.addedById,
@@ -62,7 +66,11 @@ function build(s: LoadedSession, tenant: { name: string; slug: string }, setting
     }),
   }));
   const all = rounds.flatMap((r) => r.items);
-  const totalCents = all.reduce((n, i) => n + i.totalCents, 0);
+  const consumedCents = all.reduce((n, i) => n + i.listCents, 0);
+  const compsCents = all.filter((i) => i.comped).reduce((n, i) => n + i.listCents, 0);
+  const discountCents = Math.min(s.discountCents, consumedCents - compsCents);
+  const totalCents = Math.max(0, consumedCents - compsCents - discountCents);
+  const payments = s.payments.map((p) => ({ method: p.method, amountCents: p.amountCents, tipCents: p.tipCents, receivedCents: p.receivedCents }));
 
   // Consumo por persona (apodo del comensal; lo cargado por el mozo queda como "Mesa").
   const byPerson = new Map<string, { label: string; totalCents: number; items: typeof all }>();
@@ -75,10 +83,10 @@ function build(s: LoadedSession, tenant: { name: string; slug: string }, setting
   }
 
   // Lista única para el ticket: mismo plato + mismas opciones + mismo precio → una línea sumada.
-  const merged = new Map<string, { key: string; name: string; modifiers: string[]; unitCents: number; quantity: number; totalCents: number; people: string[] }>();
+  const merged = new Map<string, { key: string; name: string; modifiers: string[]; unitCents: number; quantity: number; totalCents: number; comped: boolean; people: string[] }>();
   for (const i of all) {
-    const key = `${i.name}|${i.modifiers.join(",")}|${i.unitCents}`;
-    const line = merged.get(key) ?? { key, name: i.name, modifiers: i.modifiers, unitCents: i.unitCents, quantity: 0, totalCents: 0, people: [] };
+    const key = `${i.name}|${i.modifiers.join(",")}|${i.unitCents}|${i.comped ? "inv" : ""}`;
+    const line = merged.get(key) ?? { key, name: i.name, modifiers: i.modifiers, unitCents: i.unitCents, quantity: 0, totalCents: 0, comped: i.comped, people: [] };
     line.quantity += i.quantity;
     line.totalCents += i.totalCents;
     const who = i.addedBy ?? "Mesa";
@@ -99,6 +107,12 @@ function build(s: LoadedSession, tenant: { name: string; slug: string }, setting
     receiptToken: s.receiptToken,
     rounds,
     lines: [...merged.values()],
+    consumedCents,
+    compsCents,
+    discountCents,
+    discountReason: s.discountReason,
+    payments,
+    tipsCents: payments.reduce((n, p) => n + p.tipCents, 0),
     people: [...byPerson.values()].sort((a, b) => b.totalCents - a.totalCents),
     totalCents,
   };

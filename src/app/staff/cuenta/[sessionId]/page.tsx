@@ -4,6 +4,7 @@ import QRCode from "qrcode";
 import { requireTenantRole } from "@/lib/auth/guards";
 import { CAN_MANAGE_TABLES } from "@/lib/auth/permissions";
 import { baseUrl } from "@/lib/base-url";
+import { METHOD_LABEL } from "@/lib/billing";
 import { formatPrice } from "@/lib/format";
 import { ensureReceipt, receiptForStaff } from "@/lib/receipt";
 import { TicketActions } from "./ticket-actions";
@@ -65,7 +66,7 @@ export default async function TicketPage({ params, searchParams }: PageProps<"/s
             <p className="flex gap-2">
               <span className="w-5 shrink-0 text-right">{l.quantity}</span>
               <span className="min-w-0 flex-1">{l.name}</span>
-              <span className="shrink-0 tabular-nums">{formatPrice(l.totalCents)}</span>
+              <span className="shrink-0 tabular-nums">{l.comped ? "INVITA" : formatPrice(l.totalCents)}</span>
             </p>
             {l.modifiers.length > 0 && <p className="pl-7 text-[11px]">+ {l.modifiers.join(", ")}</p>}
             {l.quantity > 1 && <p className="pl-7 text-[11px]">({formatPrice(l.unitCents)} c/u)</p>}
@@ -73,11 +74,57 @@ export default async function TicketPage({ params, searchParams }: PageProps<"/s
         ))}
 
         <Rule />
+        {(r.compsCents > 0 || r.discountCents > 0) && (
+          <>
+            <p className="flex justify-between">
+              <span>Consumo</span>
+              <span className="tabular-nums">{formatPrice(r.consumedCents)}</span>
+            </p>
+            {r.compsCents > 0 && (
+              <p className="flex justify-between">
+                <span>Invitación de la casa</span>
+                <span className="tabular-nums">−{formatPrice(r.compsCents)}</span>
+              </p>
+            )}
+            {r.discountCents > 0 && (
+              <p className="flex justify-between">
+                <span>Descuento{r.discountReason ? ` (${r.discountReason})` : ""}</span>
+                <span className="tabular-nums">−{formatPrice(r.discountCents)}</span>
+              </p>
+            )}
+          </>
+        )}
         <p className="flex justify-between text-base font-bold">
           <span>TOTAL</span>
           <span className="tabular-nums">{formatPrice(r.totalCents)}</span>
         </p>
         <p className="text-right text-[11px]">IVA incluido</p>
+
+        {r.payments.length > 0 && (
+          <>
+            <Rule />
+            {r.payments.map((p, i) => (
+              <div key={i}>
+                <p className="flex justify-between">
+                  <span>{METHOD_LABEL[p.method]}</span>
+                  <span className="tabular-nums">{formatPrice(p.amountCents)}</span>
+                </p>
+                {p.receivedCents != null && p.receivedCents > p.amountCents + p.tipCents && (
+                  <p className="flex justify-between pl-3 text-[11px]">
+                    <span>Entregado {formatPrice(p.receivedCents)} · Cambio</span>
+                    <span className="tabular-nums">{formatPrice(p.receivedCents - p.amountCents - p.tipCents)}</span>
+                  </p>
+                )}
+              </div>
+            ))}
+            {r.tipsCents > 0 && (
+              <p className="flex justify-between">
+                <span>Propina · ¡gracias!</span>
+                <span className="tabular-nums">{formatPrice(r.tipsCents)}</span>
+              </p>
+            )}
+          </>
+        )}
 
         {r.people.length > 1 && (
           <>

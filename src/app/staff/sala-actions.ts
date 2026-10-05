@@ -9,6 +9,7 @@ import { CAN_MANAGE_TABLES } from "@/lib/auth/permissions";
 import { notifyStaff, notifyTable } from "@/lib/realtime/server";
 import { buildModifiers, unitPrice, type Modifier } from "@/lib/order-lines";
 import { getPrepMode, routeStations } from "@/lib/prep";
+import { computeBill } from "@/lib/billing";
 import { ensureReceipt } from "@/lib/receipt";
 import { tableLabelOf } from "@/lib/table-session";
 import type { TenantDb } from "@/lib/tenant-db";
@@ -252,25 +253,138 @@ async function finish(tdb: TenantDb, sessionId: string, ids: string[]) {
 }
 
 /** Caja confirma el cobro: la mesa se libera y su QR vuelve a funcionar para los próximos comensales. */
+export type PaymentInput = {
+  method: "CASH" | "CARD" | "BIZUM" | "OTHER";
+  amountCents: number;
+  tipCents?: number;
+  /** Solo efectivo: con cuánto pagó (para el cambio). */
+  receivedCents?: number | null;
+};
+
+/**
+ * Cobrar la mesa: uno o varios pagos (dividir, efectivo + tarjeta…), con propina opcional.
+ * Lo pagado debe cubrir exactamente lo que falta; el total se calcula en el servidor.
+ * Al terminar, la mesa se libera y su QR queda listo para los próximos comensales.
+ */
+export async function checkout(sessionId: string, payments: PaymentInput[]): Promise<ActionState> {
+  const { tdb, tenant, membership } = await auth();
+  if (!CASHIER_ROLES.includes(membership.role)) return err("Solo caja puede cobrar");
+  const st = await sessionTables(tdb, sessionId);
+  if (!st) return err("La mesa no está abierta");
+  if (!Array.isArray(payments) || payments.length > 20) return err("Pagos no válidos");
+
+  const bill = await computeBill(tdb, sessionId);
+  const clean: PaymentInput[] = [];
+  for (const p of payments) {
+    if (!["CASH", "CARD", "BIZUM", "OTHER"].includes(p.method)) return err("Forma de pago no válida");
+    const amount = Math.round(p.amountCents);
+    const tip = Math.round(p.tipCents ?? 0);
+    if (!(amount > 0) || amount > 10_000_000 || tip < 0 || tip > 1_000_000) return err("Importe no válido");
+    const received = p.method === "CASH" && p.receivedCents != null ? Math.round(p.receivedCents) : null;
+    if (received != null && received < amount + tip) return err("El efectivo entregado no alcanza");
+    clean.push({ method: p.method, amountCents: amount, tipCents: tip, receivedCents: received });
+  }
+  const paying = clean.reduce((n, p) => n + p.amountCents, 0);
+  if (paying !== bill.remainingCents) {
+    return err(
+      paying < bill.remainingCents
+        ? `Faltan ${((bill.remainingCents - paying) / 100).toFixed(2).replace(".", ",")} € para cubrir la cuenta`
+        : `Se cobra de más: sobran ${((paying - bill.remainingCents) / 100).toFixed(2).replace(".", ",")} €`,
+    );
+  }
+
+  const shift = await tdb.cashShift.findFirst({ where: { closedAt: null }, orderBy: { openedAt: "desc" } });
+  await ensureReceipt(tdb, sessionId);
+  await tdb.$transaction(async (tx) => {
+    for (const p of clean) {
+      await tx.payment.create({
+        data: {
+          tenantId: tenant.id,
+          sessionId,
+          shiftId: shift?.id ?? null,
+          method: p.method,
+          amountCents: p.amountCents,
+          tipCents: p.tipCents ?? 0,
+          receivedCents: p.receivedCents ?? null,
+          createdById: membership.id,
+        },
+      });
+    }
+    // Total cobrado (para métricas): ya descontadas invitaciones y descuento.
+    await tx.tableSession.update({ where: { id: sessionId }, data: { totalCents: bill.totalCents, status: "PENDING_PAYMENT" } });
+  });
+  await finish(tdb, sessionId, st.ids);
+  await refresh(tenant.id, sessionId);
+  return ok("Cobrado. Mesa libre.");
+}
+
+/** Mesa sin nada que cobrar (todo invitado o con descuento total): se cierra sin pagos. */
 export async function confirmPayment(sessionId: string): Promise<ActionState> {
   const { tdb, tenant, membership } = await auth();
   if (!CASHIER_ROLES.includes(membership.role)) return err("Solo caja puede confirmar el cobro");
   const st = await sessionTables(tdb, sessionId);
   if (!st) return err("La mesa no está abierta");
-  if (st.session.status !== "PENDING_PAYMENT") return err("Primero hay que cerrar la mesa");
+  const bill = await computeBill(tdb, sessionId);
+  if (bill.remainingCents > 0) return err("La mesa tiene importe pendiente: cobrala desde \"Cobrar\"");
   await ensureReceipt(tdb, sessionId);
-  // Total cobrado (para métricas). Se calcula de los pedidos, nunca del cliente.
-  const items = await tdb.orderItem.findMany({
-    where: { order: { sessionId, status: { not: "REJECTED" } }, status: { not: "CANCELLED" } },
-    select: { unitPriceCents: true, quantity: true },
-  });
-  await tdb.tableSession.update({
-    where: { id: sessionId },
-    data: { totalCents: items.reduce((n, i) => n + i.unitPriceCents * i.quantity, 0) },
-  });
+  await tdb.tableSession.update({ where: { id: sessionId }, data: { totalCents: bill.totalCents } });
   await finish(tdb, sessionId, st.ids);
   await refresh(tenant.id, sessionId);
-  return ok("Cobro confirmado. Mesa libre.");
+  return ok("Mesa cerrada. Mesa libre.");
+}
+
+// ─────────────────────────────────────────────────────────────
+// Invitaciones y descuentos
+// ─────────────────────────────────────────────────────────────
+
+/** La casa invita (o deja de invitar) un plato. */
+export async function compItem(itemId: string, comped: boolean, reason?: string): Promise<ActionState> {
+  const { tdb, tenant, membership } = await auth();
+  if (!CASHIER_ROLES.includes(membership.role)) return err("Solo caja o admin pueden invitar");
+  const item = await tdb.orderItem.findFirst({
+    where: { id: itemId, order: { session: { status: { not: "CLOSED" } } } },
+    include: { order: true },
+  });
+  if (!item) return err("Plato no encontrado o mesa ya cobrada");
+  await tdb.orderItem.update({
+    where: { id: itemId },
+    data: { comped, compReason: comped ? (reason ?? "").trim().slice(0, 80) || "Invitación" : null },
+  });
+  await refresh(tenant.id, item.order.sessionId);
+  return ok(comped ? "Invitado por la casa" : "Invitación quitada");
+}
+
+/** Descuento sobre la cuenta, en % o en euros. Se guarda en céntimos y nunca supera lo consumido. */
+export async function setDiscount(
+  sessionId: string,
+  input: { kind: "percent" | "amount"; value: number; reason?: string },
+): Promise<ActionState> {
+  const { tdb, tenant, membership } = await auth();
+  if (!CASHIER_ROLES.includes(membership.role)) return err("Solo caja o admin pueden hacer descuentos");
+  const bill = await computeBill(tdb, sessionId);
+  if (bill.status === "CLOSED") return err("La mesa ya se cobró");
+  if (bill.paidCents > 0) return err("Ya hay pagos registrados");
+  const base = bill.consumedCents - bill.compsCents;
+  const value = Number(input.value);
+  if (!Number.isFinite(value) || value < 0) return err("Descuento no válido");
+  const cents =
+    input.kind === "percent" ? Math.round((base * Math.min(value, 100)) / 100) : Math.min(Math.round(value * 100), base);
+  await tdb.tableSession.update({
+    where: { id: sessionId },
+    data: {
+      discountCents: cents,
+      discountReason: cents > 0 ? (input.reason ?? "").trim().slice(0, 80) || (input.kind === "percent" ? `${value}%` : null) : null,
+    },
+  });
+  await refresh(tenant.id, sessionId);
+  return ok(cents > 0 ? "Descuento aplicado" : "Descuento quitado");
+}
+
+/** Para el diálogo de cobro: la cuenta actual de la mesa. */
+export async function getBill(sessionId: string) {
+  const { tdb, membership } = await auth();
+  if (!CASHIER_ROLES.includes(membership.role)) return null;
+  return computeBill(tdb, sessionId);
 }
 
 /** Abierta por error / se fueron sin consumir: se libera sin pasar por caja (solo si no hay pedidos). */

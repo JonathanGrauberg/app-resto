@@ -19,6 +19,8 @@ const TENANT_MODELS = new Set([
   "Reservation",
   "Event",
   "Notification",
+  "Payment",
+  "CashShift",
 ]);
 
 const WHERE_OPS = new Set([

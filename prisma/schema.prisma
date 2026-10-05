@@ -50,6 +50,8 @@ model Tenant {
   translations   Translation[]
   modifierGroups ModifierGroup[]
   cartItems      CartItem[]
+  payments       Payment[]
+  cashShifts     CashShift[]
 }
 
 /// Cómo se reparten los pedidos para preparar.
@@ -265,8 +267,12 @@ model TableSession {
   receiptToken      String?       @unique
   /// Nombre de la mesa al cerrar (ej. "3+4"): las mesas juntadas se separan al cobrar.
   tableLabel        String?
+  /// Descuento sobre la cuenta (céntimos) y su motivo.
+  discountCents     Int           @default(0)
+  discountReason    String?
 
   orders    Order[]
+  payments  Payment[]
   cartItems CartItem[]
 
   @@index([tenantId, status])
@@ -486,6 +492,9 @@ model OrderItem {
   station        PrepStation
   status         ItemStatus  @default(PENDING)
   readyAt        DateTime?
+  /// Invitación de la casa: el plato no se cobra.
+  comped         Boolean     @default(false)
+  compReason     String?
   deliveredAt    DateTime?
 
   @@index([tenantId, station, status])
@@ -583,4 +592,56 @@ model Notification {
   createdAt          DateTime         @default(now())
 
   @@index([tenantId, createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Caja: pagos y turnos
+// ─────────────────────────────────────────────────────────────
+
+enum PaymentMethod {
+  CASH
+  CARD
+  BIZUM
+  OTHER
+}
+
+/// Un pago de una mesa. Una mesa puede pagarse con varios (dividir, mixto efectivo + tarjeta).
+model Payment {
+  id            String        @id @default(cuid())
+  tenantId      String
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sessionId     String
+  session       TableSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  shiftId       String?
+  shift         CashShift?    @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  method        PaymentMethod
+  /// Importe que se aplica a la cuenta (sin propina).
+  amountCents   Int
+  tipCents      Int           @default(0)
+  /// Solo efectivo: lo que entregó el cliente (para calcular el cambio).
+  receivedCents Int?
+  createdById   String?
+  createdAt     DateTime      @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([shiftId])
+}
+
+/// Turno de caja: efectivo inicial, cobros del turno y arqueo al cerrar.
+model CashShift {
+  id               String    @id @default(cuid())
+  tenantId         String
+  tenant           Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  openedAt         DateTime  @default(now())
+  openedById       String?
+  openingCashCents Int       @default(0)
+  closedAt         DateTime?
+  closedById       String?
+  /// Efectivo contado al cerrar.
+  countedCashCents Int?
+  notes            String?
+
+  payments Payment[]
+
+  @@index([tenantId, openedAt])
 }
