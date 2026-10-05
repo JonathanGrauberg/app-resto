@@ -6,6 +6,8 @@ import type { Role } from "@/generated/prisma/enums";
 import type { ActionState } from "@/lib/actions";
 import { requireTenantRole } from "@/lib/auth/guards";
 import { CAN_MANAGE_TABLES } from "@/lib/auth/permissions";
+import { notifyStaff, notifyTable } from "@/lib/realtime/server";
+import { ensureReceipt } from "@/lib/receipt";
 import type { TenantDb } from "@/lib/tenant-db";
 
 /**
@@ -20,9 +22,12 @@ async function auth() {
   return requireTenantRole(CAN_MANAGE_TABLES);
 }
 
-function refresh() {
+/** Revalida y avisa en vivo: al personal del local y, si corresponde, a los comensales de esa mesa. */
+async function refresh(tenantId: string, sessionId?: string) {
   revalidatePath("/staff", "layout");
   revalidatePath("/admin", "layout");
+  await notifyStaff(tenantId, { type: "table" });
+  if (sessionId) await notifyTable(tenantId, sessionId, { type: "session" });
 }
 
 const ok = (message: string): ActionState => ({ ok: message, at: Date.now() });
@@ -63,17 +68,17 @@ export async function openTable(tableId: string, guests: number): Promise<Action
     },
   });
   await tdb.table.updateMany({ where: { id: { in: ids } }, data: { status: "OCCUPIED" } });
-  refresh();
+  await refresh(tenant.id);
   return ok("Mesa abierta");
 }
 
 export async function setGuests(sessionId: string, guests: number): Promise<ActionState> {
-  const { tdb } = await auth();
+  const { tdb, tenant } = await auth();
   const n = Math.round(guests);
   if (n < 1 || n > MAX_GUESTS) return err("Cantidad no válida");
   // Se permite superar el tope de la mesa (llega alguien más y se suma una silla).
   await tdb.tableSession.update({ where: { id: sessionId, status: { not: "CLOSED" } }, data: { guests: n } });
-  refresh();
+  await refresh(tenant.id, sessionId);
   return ok("Comensales actualizados");
 }
 
@@ -82,7 +87,7 @@ export async function setGuests(sessionId: string, guests: number): Promise<Acti
 // ─────────────────────────────────────────────────────────────
 
 export async function assignWaiter(sessionId: string, waiterId: string | null): Promise<ActionState> {
-  const { tdb, membership } = await auth();
+  const { tdb, tenant, membership } = await auth();
   const session = await tdb.tableSession.findUnique({ where: { id: sessionId } });
   if (!session || session.status === "CLOSED") return err("La mesa no está abierta");
 
@@ -97,7 +102,7 @@ export async function assignWaiter(sessionId: string, waiterId: string | null): 
   }
 
   await tdb.tableSession.update({ where: { id: sessionId }, data: { waiterId } });
-  refresh();
+  await refresh(tenant.id, sessionId);
   return ok(waiterId ? "Mozo asignado" : "Mesa sin mozo");
 }
 
@@ -135,13 +140,13 @@ export async function joinTables(tableIds: string[]): Promise<ActionState> {
     });
     if (oldGroups.length) await tx.tableGroup.deleteMany({ where: { id: { in: oldGroups } } });
   });
-  refresh();
+  await refresh(tenant.id);
   return ok("Mesas juntadas");
 }
 
 /** Separa todas las mesas de un grupo. La que tiene la sesión sigue ocupada; las demás quedan libres. */
 export async function separateTables(tableId: string): Promise<ActionState> {
-  const { tdb } = await auth();
+  const { tdb, tenant } = await auth();
   const table = await tdb.table.findUniqueOrThrow({ where: { id: tableId } });
   if (!table.groupId) return err("La mesa no está unida a otra");
   const ids = await groupTableIds(tdb, tableId);
@@ -155,7 +160,7 @@ export async function separateTables(tableId: string): Promise<ActionState> {
     }
     await tx.tableGroup.delete({ where: { id: table.groupId! } });
   });
-  refresh();
+  await refresh(tenant.id);
   return ok("Mesas separadas");
 }
 
@@ -171,23 +176,25 @@ async function sessionTables(tdb: TenantDb, sessionId: string) {
 
 /** El mozo pide cerrar: la mesa queda pendiente de cobro y su QR deja de aceptar pedidos. */
 export async function requestClose(sessionId: string): Promise<ActionState> {
-  const { tdb } = await auth();
+  const { tdb, tenant } = await auth();
   const st = await sessionTables(tdb, sessionId);
   if (!st) return err("La mesa no está abierta");
   await tdb.tableSession.update({ where: { id: sessionId }, data: { status: "PENDING_PAYMENT", closeRequestedAt: new Date() } });
+  // La cuenta (y su QR) queda lista para imprimir y para que la vean en sus celulares.
+  await ensureReceipt(tdb, sessionId);
   await tdb.table.updateMany({ where: { id: { in: st.ids } }, data: { status: "PENDING_PAYMENT" } });
-  refresh();
+  await refresh(tenant.id, sessionId);
   return ok("Mesa enviada a caja para cobrar");
 }
 
 /** Deshace el pedido de cierre (por ejemplo, piden algo más). */
 export async function reopenTable(sessionId: string): Promise<ActionState> {
-  const { tdb } = await auth();
+  const { tdb, tenant } = await auth();
   const st = await sessionTables(tdb, sessionId);
   if (!st || st.session.status !== "PENDING_PAYMENT") return err("La mesa no está pendiente de cobro");
   await tdb.tableSession.update({ where: { id: sessionId }, data: { status: "OPEN", closeRequestedAt: null } });
   await tdb.table.updateMany({ where: { id: { in: st.ids } }, data: { status: "OCCUPIED" } });
-  refresh();
+  await refresh(tenant.id, sessionId);
   return ok("Mesa reabierta");
 }
 
@@ -235,25 +242,35 @@ async function finish(tdb: TenantDb, sessionId: string, ids: string[]) {
 
 /** Caja confirma el cobro: la mesa se libera y su QR vuelve a funcionar para los próximos comensales. */
 export async function confirmPayment(sessionId: string): Promise<ActionState> {
-  const { tdb, membership } = await auth();
+  const { tdb, tenant, membership } = await auth();
   if (!CASHIER_ROLES.includes(membership.role)) return err("Solo caja puede confirmar el cobro");
   const st = await sessionTables(tdb, sessionId);
   if (!st) return err("La mesa no está abierta");
   if (st.session.status !== "PENDING_PAYMENT") return err("Primero hay que cerrar la mesa");
+  await ensureReceipt(tdb, sessionId);
+  // Total cobrado (para métricas). Se calcula de los pedidos, nunca del cliente.
+  const items = await tdb.orderItem.findMany({
+    where: { order: { sessionId, status: { not: "REJECTED" } }, status: { not: "CANCELLED" } },
+    select: { unitPriceCents: true, quantity: true },
+  });
+  await tdb.tableSession.update({
+    where: { id: sessionId },
+    data: { totalCents: items.reduce((n, i) => n + i.unitPriceCents * i.quantity, 0) },
+  });
   await finish(tdb, sessionId, st.ids);
-  refresh();
+  await refresh(tenant.id, sessionId);
   return ok("Cobro confirmado. Mesa libre.");
 }
 
 /** Abierta por error / se fueron sin consumir: se libera sin pasar por caja (solo si no hay pedidos). */
 export async function releaseTable(sessionId: string): Promise<ActionState> {
-  const { tdb } = await auth();
+  const { tdb, tenant } = await auth();
   const st = await sessionTables(tdb, sessionId);
   if (!st) return err("La mesa no está abierta");
   const orders = await tdb.order.count({ where: { sessionId, status: { not: "REJECTED" } } });
   if (orders > 0) return err("La mesa tiene pedidos: hay que cerrarla y cobrarla");
   await finish(tdb, sessionId, st.ids);
-  refresh();
+  await refresh(tenant.id, sessionId);
   return ok("Mesa liberada");
 }
 
@@ -325,13 +342,13 @@ export async function addExtraTable(areaId: string, seats: number, joinWith?: st
     if (res?.error) return res;
     return ok(`Mesa X${i} sumada`);
   }
-  refresh();
+  await refresh(tenant.id);
   return ok(`Mesa extra X${i} agregada`);
 }
 
 /** Quita una mesa extra que quedó libre (por ejemplo, se separó y ya no hace falta). */
 export async function removeExtraTable(tableId: string): Promise<ActionState> {
-  const { tdb } = await auth();
+  const { tdb, tenant } = await auth();
   const t = await tdb.table.findUnique({ where: { id: tableId } });
   if (!t || !t.temporary) return err("Solo se pueden quitar mesas extra");
   if (t.groupId) return err("Separala antes de quitarla");
@@ -342,6 +359,62 @@ export async function removeExtraTable(tableId: string): Promise<ActionState> {
   } else {
     await tdb.table.delete({ where: { id: tableId } });
   }
-  refresh();
+  await refresh(tenant.id);
   return ok("Mesa extra quitada");
+}
+
+// ─────────────────────────────────────────────────────────────
+// Pedidos de los comensales y llamadas al mozo
+// ─────────────────────────────────────────────────────────────
+
+async function orderWithSession(tdb: TenantDb, orderId: string) {
+  return tdb.order.findUnique({ where: { id: orderId }, include: { session: true } });
+}
+
+/** El mozo valida el pedido: pasa a cocina/bar. Si la mesa no tenía mozo, queda asignada a quien lo acepta. */
+export async function acceptOrder(orderId: string): Promise<ActionState> {
+  const { tdb, tenant, membership } = await auth();
+  const order = await orderWithSession(tdb, orderId);
+  if (!order) return err("Pedido no encontrado");
+  if (order.status !== "PENDING") return err("Ese pedido ya fue procesado");
+  if (membership.role === "MOZO" && order.session.waiterId && order.session.waiterId !== membership.id) {
+    return err("Es una mesa de otro mozo");
+  }
+
+  await tdb.order.update({
+    where: { id: orderId },
+    data: { status: "ACCEPTED", acceptedById: membership.id, acceptedAt: new Date() },
+  });
+  if (!order.session.waiterId && membership.role === "MOZO") {
+    await tdb.tableSession.update({ where: { id: order.sessionId }, data: { waiterId: membership.id } });
+  }
+  await notifyStaff(tenant.id, { type: "order.updated", sessionId: order.sessionId, orderId });
+  await notifyTable(tenant.id, order.sessionId, { type: "order", orderId });
+  revalidatePath("/staff", "layout");
+  revalidatePath("/admin", "layout");
+  return ok("Pedido aceptado y enviado a preparación");
+}
+
+export async function rejectOrder(orderId: string, reason: string): Promise<ActionState> {
+  const { tdb, tenant } = await auth();
+  const order = await orderWithSession(tdb, orderId);
+  if (!order) return err("Pedido no encontrado");
+  if (order.status !== "PENDING") return err("Ese pedido ya fue procesado");
+  await tdb.order.update({
+    where: { id: orderId },
+    data: { status: "REJECTED", rejectReason: reason.trim().slice(0, 140) || null },
+  });
+  await notifyStaff(tenant.id, { type: "order.updated", sessionId: order.sessionId, orderId });
+  await notifyTable(tenant.id, order.sessionId, { type: "order", orderId });
+  revalidatePath("/staff", "layout");
+  revalidatePath("/admin", "layout");
+  return ok("Pedido rechazado");
+}
+
+/** "Ya fui": apaga el aviso de mesa que llama al mozo. */
+export async function dismissCall(sessionId: string): Promise<ActionState> {
+  const { tdb, tenant } = await auth();
+  await tdb.tableSession.update({ where: { id: sessionId }, data: { waiterCalledAt: null } });
+  await refresh(tenant.id, sessionId);
+  return ok("Llamada atendida");
 }

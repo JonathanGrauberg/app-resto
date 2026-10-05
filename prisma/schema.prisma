@@ -253,6 +253,10 @@ model TableSession {
   totalCents        Int?
   reviewPromptShown Boolean       @default(false)
   waiterCalledAt    DateTime?
+  /// Enlace secreto de la cuenta (QR del ticket). Vale mientras la mesa está abierta y 24 h después de cobrar.
+  receiptToken      String?       @unique
+  /// Nombre de la mesa al cerrar (ej. "3+4"): las mesas juntadas se separan al cobrar.
+  tableLabel        String?
 
   orders    Order[]
   cartItems CartItem[]
@@ -403,6 +407,8 @@ model CartItem {
   notes     String?
   /// Apodo del comensal que lo agregó ("Ana", "Comensal 2").
   addedBy   String?
+  /// Id del comensal (cookie de la mesa) que lo agregó: permite editar "lo mío" y dividir la cuenta.
+  addedById String?
   createdAt DateTime     @default(now())
 
   @@index([sessionId])
@@ -466,6 +472,9 @@ model OrderItem {
   quantity       Int
   modifiers      Json        @default("[]")
   notes          String?
+  /// Comensal que lo pidió (apodo e id), copiado del carrito.
+  addedBy        String?
+  addedById      String?
   station        PrepStation
   status         ItemStatus  @default(PENDING)
   readyAt        DateTime?

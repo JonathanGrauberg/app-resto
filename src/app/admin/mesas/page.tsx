@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Armchair, PencilRuler } from "lucide-react";
 import { PageHeader } from "@/components/app-shell";
+import { ClosedToday } from "@/components/sala/closed-today";
 import { SalaView } from "@/components/sala/sala-view";
 import { TableLegend } from "@/components/table-map";
 import { requireTenantRole } from "@/lib/auth/guards";
 import { ADMIN_ROLES } from "@/lib/auth/permissions";
 import { cn } from "@/lib/format";
-import { getSalaData } from "@/lib/sala";
+import { getClosedToday, getSalaData } from "@/lib/sala";
 import { FloorEditor } from "./floor-editor";
 
 export const metadata: Metadata = { title: "Mesas" };
@@ -46,7 +47,7 @@ export default async function AdminMesasPage({ searchParams }: PageProps<"/admin
   );
 
   if (live) {
-    const data = await getSalaData(tdb);
+    const [data, closed] = await Promise.all([getSalaData(tdb), getClosedToday(tdb)]);
     return (
       <>
         <PageHeader title="Salones y mesas" description="Operación en vivo: lo mismo que ven mozos y caja." />
@@ -57,6 +58,7 @@ export default async function AdminMesasPage({ searchParams }: PageProps<"/admin
           slug={tenant.slug}
           venue={tenant.name}
         />
+        <ClosedToday rows={closed} />
       </>
     );
   }

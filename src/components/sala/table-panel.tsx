@@ -8,8 +8,8 @@ import {
   Link2,
   Minus,
   Plus,
+  Printer,
   QrCode,
-  ReceiptText,
   SquarePlus,
   Trash2,
   Unlink,
@@ -17,6 +17,7 @@ import {
   UserMinus,
 } from "lucide-react";
 import { QrDialog } from "@/components/qr-dialog";
+import { OrdersSection } from "./orders-section";
 import { STATUS_STYLE } from "@/components/table-map";
 import { cn } from "@/lib/format";
 import type { SalaSession, SalaTable } from "@/lib/sala";
@@ -24,6 +25,7 @@ import {
   addExtraTable,
   assignWaiter,
   confirmPayment,
+  dismissCall,
   openTable,
   releaseTable,
   removeExtraTable,
@@ -206,17 +208,37 @@ export function TablePanel({
             </section>
           )}
 
-          {/* Pedidos (Fase 3) */}
-          {session && (
-            <section className="rounded-xl border border-dashed border-line p-3 text-sm text-muted">
-              <p className="flex items-center gap-2 font-medium text-ink">
-                <ReceiptText className="size-4" aria-hidden /> Pedidos y pre-cuenta
-              </p>
-              <p className="mt-0.5">Se verán acá cuando estén los pedidos (Fase 3) y la caja (Fase 4).</p>
+          {/* Llama al mozo */}
+          {session?.waiterCalledAt && (
+            <section className="flex items-center gap-3 rounded-xl bg-warn p-3 text-sm text-white">
+              <span className="flex-1 font-semibold">La mesa está llamando al mozo</span>
+              <button
+                onClick={() => run(() => dismissCall(session.id))}
+                disabled={pending}
+                className="rounded-lg bg-white/20 px-3 py-1.5 font-medium hover:bg-white/30"
+              >
+                Ya fui
+              </button>
             </section>
           )}
 
+          {/* Pedidos */}
+          {session && <OrdersSection session={session} onDone={onDone} />}
+
           {/* Cierre y cobro */}
+          {session && (
+            <a
+              href={`/staff/cuenta/${session.id}${session.status === "PENDING_PAYMENT" ? "?auto=1" : ""}`}
+              className={cn(
+                "flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-medium",
+                session.status === "PENDING_PAYMENT" ? "bg-brand text-brand-ink" : "border border-line hover:bg-ink/5",
+              )}
+            >
+              <Printer className="size-4" aria-hidden />
+              {session.status === "PENDING_PAYMENT" ? "Imprimir cuenta" : "Ver / imprimir pre-cuenta"}
+            </a>
+          )}
+
           {session?.status === "OPEN" && (
             <section className="space-y-2">
               <button

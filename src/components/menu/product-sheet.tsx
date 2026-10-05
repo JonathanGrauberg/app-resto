@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Users } from "lucide-react";
+import { useTable } from "@/components/table/table-context";
+import { joinNames } from "@/lib/people";
 import { Minus, Plus } from "lucide-react";
 import { Photo } from "@/components/mock-image";
 import { ALLERGENS } from "@/lib/allergens";
@@ -10,19 +13,41 @@ import { CloseButton } from "./menu-browser";
 
 /**
  * Ficha de producto. En celular es una hoja inferior; en pantallas grandes, un diálogo centrado.
- * "Añadir" se conecta al carrito compartido de la mesa en la Fase 2.
+ * Dentro de una mesa (QR), "Añadir" suma al carrito compartido de la mesa.
  */
-export function ProductSheet({
-  product: p,
-  tableNumber,
-  onClose,
-}: {
-  product: PublicProduct;
-  tableNumber?: string;
-  onClose: () => void;
-}) {
+export function ProductSheet({ product: p, onClose }: { product: PublicProduct; onClose: () => void }) {
+  const table = useTable();
   const [qty, setQty] = useState(1);
   const [selected, setSelected] = useState<Record<string, string[]>>({});
+  const [notes, setNotes] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Lo que ya hay de este plato en la mesa (pedido o en el carrito de otro), para no repetir sin querer.
+  const myId = table?.info.diner?.dinerId;
+  const who = (addedById: string | null, addedBy: string | null) => (myId && addedById === myId ? "vos" : (addedBy ?? "el mozo"));
+  const alreadyOrdered = table
+    ? table.info.state.orders
+        .filter((o) => o.status !== "REJECTED")
+        .flatMap((o) => o.items.filter((i) => i.productId === p.id).map((i) => `${who(i.addedById, i.addedBy)} (${i.quantity}×)`))
+    : [];
+  const inCart = table
+    ? table.info.state.cart.filter((c) => c.productId === p.id).map((c) => `${who(c.addedById, c.addedBy)} (${c.quantity}×)`)
+    : [];
+
+  const add = async () => {
+    if (!table) return;
+    setAdding(true);
+    setError(null);
+    const res = await table.add({ productId: p.id, quantity: qty, optionIds: Object.values(selected).flat(), notes });
+    setAdding(false);
+    if (res.ok) {
+      table.toast(qty > 1 ? `${qty}× ${p.name} al pedido` : `${p.name} al pedido`);
+      onClose();
+    } else if (res.error && res.error !== "cancelado") {
+      setError(res.error);
+    }
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -133,7 +158,25 @@ export function ProductSheet({
               </fieldset>
             ))}
 
-            {tableNumber && (
+            {(alreadyOrdered.length > 0 || inCart.length > 0) && (
+              <div className="flex gap-2.5 rounded-xl border border-brand/40 bg-brand-soft p-3 text-sm">
+                <Users className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />
+                <div className="space-y-0.5">
+                  {alreadyOrdered.length > 0 && (
+                    <p>
+                      <span className="font-semibold">Ya lo pidieron en esta mesa:</span> {joinNames(alreadyOrdered)}.
+                    </p>
+                  )}
+                  {inCart.length > 0 && (
+                    <p>
+                      <span className="font-semibold">Está en el pedido sin enviar:</span> {joinNames(inCart)}.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {table && (
               <div>
                 <label htmlFor="notes" className="mb-1.5 block text-sm font-medium">
                   Notas para cocina
@@ -141,8 +184,11 @@ export function ProductSheet({
                 <textarea
                   id="notes"
                   rows={2}
+                  maxLength={140}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
                   placeholder="Ej.: sin sal, bien caliente…"
-                  className="w-full rounded-xl border border-line px-3 py-2 text-base focus:border-brand focus:outline-none"
+                  className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-base focus:border-brand focus:outline-none"
                 />
               </div>
             )}
@@ -150,28 +196,31 @@ export function ProductSheet({
         </div>
 
         <div className="border-t border-line p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          {error && <p className="mb-3 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{error}</p>}
           {!p.available ? (
             <p className="text-center font-medium text-danger">Agotado por hoy</p>
-          ) : tableNumber ? (
+          ) : table && !table.canOrder ? (
+            <p className="text-center text-sm text-muted">La mesa está cerrando la cuenta: ya no se pueden sumar pedidos.</p>
+          ) : table ? (
             <div className="flex gap-3">
               <div className="flex items-center rounded-xl border border-line">
                 <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="p-3" aria-label="Menos">
                   <Minus className="size-4" aria-hidden />
                 </button>
                 <span className="w-6 text-center font-medium tabular-nums">{qty}</span>
-                <button onClick={() => setQty((q) => q + 1)} className="p-3" aria-label="Más">
+                <button onClick={() => setQty((q) => Math.min(20, q + 1))} className="p-3" aria-label="Más">
                   <Plus className="size-4" aria-hidden />
                 </button>
               </div>
               <button
-                disabled
-                title="Disponible en la Fase 2"
+                onClick={add}
+                disabled={missingRequired || adding}
                 className={cn(
                   "flex h-12 flex-1 items-center justify-between rounded-xl bg-brand px-4 font-medium text-brand-ink",
                   "disabled:opacity-50",
                 )}
               >
-                <span>{missingRequired ? "Elegí las opciones" : "Añadir"}</span>
+                <span>{missingRequired ? "Elegí las opciones" : adding ? "Agregando…" : "Añadir al pedido"}</span>
                 <span className="tabular-nums">{formatPrice(unit * qty)}</span>
               </button>
             </div>

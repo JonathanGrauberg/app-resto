@@ -1,10 +1,12 @@
 import { AppShell, type NavItem } from "@/components/app-shell";
+import { StaffLive } from "@/components/staff-live";
 import { requireTenantRole } from "@/lib/auth/guards";
 import { ADMIN_ROLES } from "@/lib/auth/permissions";
 import { getEnabledModules } from "@/lib/modules";
+import { staffChannel } from "@/lib/realtime/server";
 
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
-  const { tenant, user } = await requireTenantRole(ADMIN_ROLES);
+  const { tenant, user, membership } = await requireTenantRole(ADMIN_ROLES);
   const modules = await getEnabledModules(tenant.id);
 
   const nav: NavItem[] = [
@@ -21,6 +23,12 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   return (
     <AppShell title={tenant.name} subtitle="Administración" nav={nav} userName={user.name}>
       {children}
+      <StaffLive
+        channel={staffChannel(tenant.id)}
+        membershipId={membership.id}
+        role={membership.role}
+        salaHref="/admin/mesas?vista=sala"
+      />
     </AppShell>
   );
 }

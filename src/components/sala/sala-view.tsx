@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
-import { Link2, Plus, Users, X } from "lucide-react";
+import { useMemo, useState, useTransition } from "react";
+import { BellRing, Link2, Plus, Users, X } from "lucide-react";
 import { STATUS_STYLE, TableLegend } from "@/components/table-map";
 import { cn } from "@/lib/format";
 import type { SalaData, SalaTable } from "@/lib/sala";
@@ -31,11 +31,7 @@ export function SalaView({
   const [extraSeats, setExtraSeats] = useState<number | null>(null); // formulario "mesa extra" suelta
   const [extraMsg, setExtraMsg] = useState<string | null>(null);
 
-  // Hasta tener tiempo real (Fase 3), la sala se refresca sola cada 10 s si la pestaña está visible.
-  useEffect(() => {
-    const id = setInterval(() => document.visibilityState === "visible" && router.refresh(), 10_000);
-    return () => clearInterval(id);
-  }, [router]);
+  // La actualización en vivo la hace <StaffLive> (en el layout), con respaldo periódico si se corta.
 
   const allTables = useMemo(() => data.areas.flatMap((a) => a.tables), [data.areas]);
   const area = data.areas.find((a) => a.id === areaId) ?? data.areas[0];
@@ -47,7 +43,9 @@ export function SalaView({
     const open = data.sessions.filter((s) => s.status === "OPEN").length;
     const guests = data.sessions.reduce((n, s) => n + s.guests, 0);
     const noWaiter = data.sessions.filter((s) => s.status === "OPEN" && !s.waiterId).length;
-    return { free, pending, open, guests, noWaiter };
+    const toAccept = data.sessions.reduce((n, s) => n + s.pendingOrders, 0);
+    const calling = data.sessions.filter((s) => s.waiterCalledAt).length;
+    return { free, pending, open, guests, noWaiter, toAccept, calling };
   }, [allTables, data.sessions]);
 
   if (!area) {
@@ -115,6 +113,16 @@ export function SalaView({
           <Users className="size-4 text-muted" aria-hidden /> <strong className="tabular-nums">{stats.guests}</strong>{" "}
           <span className="text-muted">comensales</span>
         </span>
+        {stats.toAccept > 0 && (
+          <span className="rounded-full bg-danger px-2.5 py-0.5 text-xs font-semibold text-white">
+            {stats.toAccept} {stats.toAccept === 1 ? "pedido" : "pedidos"} por aceptar
+          </span>
+        )}
+        {stats.calling > 0 && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-warn px-2.5 py-0.5 text-xs font-semibold text-white">
+            <BellRing className="size-3" aria-hidden /> {stats.calling} {stats.calling === 1 ? "mesa llama" : "mesas llaman"}
+          </span>
+        )}
         {stats.noWaiter > 0 && (
           <span className="rounded-full bg-warn-soft px-2.5 py-0.5 text-xs font-medium text-warn">
             {stats.noWaiter} sin mozo
@@ -284,8 +292,27 @@ export function SalaView({
                   ) : (
                     <span className="hidden text-[10px] opacity-70 sm:block">{t.seats} p.</span>
                   )}
-                  {session && !session.waiterId && session.status === "OPEN" && (
-                    <span className="absolute -right-1 -top-1 size-3 rounded-full bg-warn ring-2 ring-surface" title="Sin mozo" />
+                  {session && session.pendingOrders > 0 ? (
+                    <span
+                      className="absolute -right-2 -top-2 flex min-w-5 animate-pulse items-center justify-center rounded-full bg-danger px-1 text-[11px] font-bold text-white ring-2 ring-surface"
+                      title="Pedidos por aceptar"
+                    >
+                      {session.pendingOrders}
+                    </span>
+                  ) : (
+                    session &&
+                    !session.waiterId &&
+                    session.status === "OPEN" && (
+                      <span className="absolute -right-1 -top-1 size-3 rounded-full bg-warn ring-2 ring-surface" title="Sin mozo" />
+                    )
+                  )}
+                  {session?.waiterCalledAt && (
+                    <span
+                      className="absolute -bottom-2 left-1/2 flex size-6 -translate-x-1/2 animate-bounce items-center justify-center rounded-full bg-warn text-white ring-2 ring-surface"
+                      title="Llama al mozo"
+                    >
+                      <BellRing className="size-3.5" aria-hidden />
+                    </span>
                   )}
                   {mine && <span className="absolute -left-1 -top-1 size-3 rounded-full bg-ok ring-2 ring-surface" title="Tu mesa" />}
 

@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { LogOut } from "lucide-react";
 import { logout } from "@/app/login/actions";
+import { StaffLive } from "@/components/staff-live";
 import { requireTenantRole } from "@/lib/auth/guards";
 import { ADMIN_ROLES, CAN_MANAGE_TABLES, ROLE_LABEL, STAFF_MANAGER_ROLES, STAFF_ROLES } from "@/lib/auth/permissions";
+import { staffChannel } from "@/lib/realtime/server";
 
 /** PWA del personal: cabecera compacta, sin barra lateral, pensada para celular y tablet. */
 export default async function StaffLayout({ children }: LayoutProps<"/staff">) {
@@ -10,7 +12,7 @@ export default async function StaffLayout({ children }: LayoutProps<"/staff">) {
 
   return (
     <div className="flex min-h-dvh flex-1 flex-col">
-      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-line bg-surface/90 px-4 py-2.5 backdrop-blur">
+      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 print:hidden border-b border-line bg-surface/90 px-4 py-2.5 backdrop-blur">
         <div className="min-w-0">
           <p className="truncate font-semibold leading-tight">{tenant.name}</p>
           <p className="truncate text-xs text-muted">
@@ -40,7 +42,13 @@ export default async function StaffLayout({ children }: LayoutProps<"/staff">) {
           </button>
         </form>
       </header>
-      <main className="flex-1 px-4 py-4 sm:px-6">{children}</main>
+      <main className="flex-1 px-4 py-4 sm:px-6 print:p-0">{children}</main>
+      <StaffLive
+        channel={staffChannel(tenant.id)}
+        membershipId={membership.id}
+        role={membership.role}
+        salaHref={membership.role === "CAJA" ? "/staff/caja" : "/staff/mozo"}
+      />
     </div>
   );
 }

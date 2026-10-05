@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { BellRing } from "lucide-react";
+import { ReceiptText } from "lucide-react";
 import { MenuExperience } from "@/components/menu/menu-experience";
 import { MenuThemeScript } from "@/components/menu/menu-theme-script";
-import { db } from "@/lib/db";
 import { getPublicMenu, getPublicTenant, toVenue } from "@/lib/public-menu";
+import { readDiner } from "@/lib/diner";
+import { tableChannel } from "@/lib/realtime/server";
+import { paidReceiptPath } from "@/lib/receipt";
+import { currentDiner, dinerTableState, tableContext } from "@/lib/table-session";
 
 export async function generateMetadata({ params }: PageProps<"/[slug]/m/[qrToken]">): Promise<Metadata> {
   const { slug } = await params;
@@ -17,19 +21,25 @@ export async function generateMetadata({ params }: PageProps<"/[slug]/m/[qrToken
 }
 
 /**
- * Entrada por QR de mesa. En la Fase 2 aquí se une el comensal a la sesión de mesa
- * compartida (carrito en vivo, pedir, llamar al mozo).
+ * Entrada por QR de mesa: carta + carrito compartido en vivo + pedidos + llamar al mozo.
+ * El comensal se une a la mesa recién cuando agrega algo o llama al mozo (mirar la carta no abre la mesa).
  */
 export default async function TableEntryPage({ params }: PageProps<"/[slug]/m/[qrToken]">) {
   const { slug, qrToken } = await params;
   const tenant = await getPublicTenant(slug);
   if (!tenant) notFound();
 
-  // qrToken es único global; se verifica además que pertenezca a este tenant.
-  const table = await db.table.findFirst({ where: { qrToken, tenantId: tenant.id } });
-  if (!table || table.status === "DISABLED" || table.archivedAt) notFound();
+  const ctx = await tableContext(slug, qrToken);
+  if (!ctx || ctx.table.status === "DISABLED") notFound();
 
-  const menu = await getPublicMenu(tenant.id);
+  const [menu, diner] = await Promise.all([getPublicMenu(tenant.id), currentDiner(ctx)]);
+  const state = diner ? await dinerTableState(ctx) : { cart: [], orders: [] };
+  const sessionStatus = !ctx.session ? "NONE" : ctx.session.status === "PENDING_PAYMENT" ? "PENDING_PAYMENT" : "OPEN";
+  const receiptUrl = ctx.session?.receiptToken ? `/${tenant.slug}/cuenta/${ctx.session.receiptToken}` : null;
+
+  // ¿Este celular estuvo en una mesa que ya pagó? Se le ofrece su cuenta mientras siga vigente (24 h).
+  const old = diner ? null : await readDiner(tenant.id);
+  const paidReceiptUrl = old ? await paidReceiptPath(tenant, old.sessionId) : null;
 
   return (
     <main className="flex-1 pb-24">
@@ -37,39 +47,41 @@ export default async function TableEntryPage({ params }: PageProps<"/[slug]/m/[q
       <MenuExperience
         venue={toVenue(tenant)}
         menu={menu}
-        tableNumber={table.number}
+        table={{
+          slug: tenant.slug,
+          qrToken,
+          label: ctx.label,
+          venue: tenant.name,
+          sessionId: ctx.session?.id ?? null,
+          sessionStatus,
+          receiptUrl,
+          diner: diner ? { nickname: diner.nickname, dinerId: diner.dinerId } : null,
+          channel: diner && ctx.session ? tableChannel(tenant.id, ctx.session.id) : null,
+          reviewUrl: tenant.settings?.googleReviewUrl ?? null,
+          state,
+        }}
         notice={
-          table.status === "PENDING_PAYMENT" && (
-            <p role="status" className="mt-4 rounded-2xl bg-warn-soft px-4 py-3 text-sm text-warn">
-              Esta mesa todavía no fue cerrada por caja. Avisá al personal si acabás de sentarte.
-            </p>
-          )
+          <>
+            {paidReceiptUrl && (
+              <Link
+                href={paidReceiptUrl}
+                className="mt-4 flex items-center gap-3 rounded-2xl bg-brand-soft px-4 py-3 text-sm ring-1 ring-brand/30"
+              >
+                <ReceiptText className="size-5 shrink-0 text-brand" aria-hidden />
+                <span className="flex-1">
+                  <span className="block font-semibold">Tu mesa ya pagó</span>
+                  <span className="text-muted">Ver el detalle de la cuenta y cuánto le toca a cada uno</span>
+                </span>
+              </Link>
+            )}
+            {sessionStatus === "PENDING_PAYMENT" && !diner && (
+              <p role="status" className="mt-4 rounded-2xl bg-warn-soft px-4 py-3 text-sm text-warn">
+                Esta mesa está cerrando la cuenta. Si recién te sentás, avisale al personal.
+              </p>
+            )}
+          </>
         }
       />
-
-      {/* Barra de acciones de mesa: se activa en la Fase 2 */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg/90 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center gap-3 sm:px-2 lg:px-6">
-          <div className="min-w-0 flex-1">
-            <p className="text-xs text-muted">Estás en</p>
-            <p className="font-semibold leading-tight">Mesa {table.number}</p>
-          </div>
-          <button
-            disabled
-            title="Disponible en la Fase 2"
-            className="flex h-12 items-center gap-2 rounded-full border border-line px-4 text-sm font-medium disabled:opacity-50"
-          >
-            <BellRing className="size-4" aria-hidden /> <span className="hidden sm:inline">Llamar</span> mozo
-          </button>
-          <button
-            disabled
-            title="Disponible en la Fase 2"
-            className="h-12 rounded-full bg-ink px-5 text-sm font-semibold text-bg disabled:opacity-50"
-          >
-            Ver pedido
-          </button>
-        </div>
-      </div>
     </main>
   );
 }

@@ -1,24 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { headers } from "next/headers";
 import { ArrowLeft } from "lucide-react";
 import QRCode from "qrcode";
 import { PageHeader } from "@/components/app-shell";
 import { requireTenantRole } from "@/lib/auth/guards";
+import { baseUrl } from "@/lib/base-url";
 import { ADMIN_ROLES } from "@/lib/auth/permissions";
 import { cn } from "@/lib/format";
 import { PrintButton } from "./print-button";
 
 export const metadata: Metadata = { title: "QR de mesas" };
-
-/** URL pública base: APP_URL en producción; en local, el host de la petición. */
-async function baseUrl() {
-  if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, "");
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
-  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  return `${proto}://${host}`;
-}
 
 export default async function QrSheetPage({ searchParams }: PageProps<"/admin/mesas/qr">) {
   const { tenant, tdb } = await requireTenantRole(ADMIN_ROLES);
