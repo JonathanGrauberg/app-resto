@@ -31,6 +31,7 @@ export default async function AdminAjustesPage() {
           websiteUrl: s?.websiteUrl ?? null,
           googleReviewUrl: s?.googleReviewUrl ?? null,
           menuTheme: s?.menuTheme ?? "DARK",
+          prepMode: s?.prepMode ?? "SEPARATE",
         }}
       />
     </>

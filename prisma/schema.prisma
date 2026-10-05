@@ -52,6 +52,12 @@ model Tenant {
   cartItems      CartItem[]
 }
 
+/// Cómo se reparten los pedidos para preparar.
+enum PrepMode {
+  SEPARATE // pantalla de cocina y pantalla de barra
+  SINGLE // una sola pantalla (cocina) recibe todo
+}
+
 enum MenuTheme {
   SYSTEM
   DARK
@@ -78,6 +84,8 @@ model TenantSettings {
   timezone        String    @default("Europe/Madrid")
   /// Tema por defecto de la carta pública (el comensal puede cambiarlo).
   menuTheme       MenuTheme @default(DARK)
+  /// Cocina y barra separadas, o todo a una sola pantalla.
+  prepMode        PrepMode  @default(SEPARATE)
   /// Idiomas adicionales que el tenant decide cargar a mano (ej. ["en","ca"]).
   extraLocales    String[]  @default([])
   /// Horarios de apertura, JSON libre por día: { "mon": [["12:00","16:00"]], ... }

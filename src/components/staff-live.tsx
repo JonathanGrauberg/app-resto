@@ -41,7 +41,10 @@ export function StaffLive({
   membershipId,
   role,
   salaHref,
+  singleScreen = false,
 }: {
+  /** Local con una sola pantalla de preparación: cocina y barra reciben todo. */
+  singleScreen?: boolean;
   channel: string | null;
   membershipId: string;
   role: Role;
@@ -62,7 +65,7 @@ export function StaffLive({
     (e: Record<string, unknown>) => {
       // Cocina / bar: solo pedidos aceptados con platos de su estación.
       if (role === "COCINA" || role === "BAR") {
-        const mine = role === "COCINA" ? "KITCHEN" : "BAR";
+        const mine = singleScreen || role === "COCINA" ? "KITCHEN" : "BAR";
         if (e.type === "kitchen.new" && (e.stations as string[] | undefined)?.includes(mine)) {
           push({ kind: "order", title: `Nuevo pedido · Mesa ${e.tableLabel}`, detail: "Aparece en Nuevos" });
         }
@@ -85,7 +88,7 @@ export function StaffLive({
         push({ kind: "call", title: `Mesa ${e.tableLabel} llama al mozo`, detail: waiterId ? "" : "La mesa no tiene mozo asignado" });
       }
     },
-    [membershipId, role, push],
+    [membershipId, role, push, singleScreen],
   );
 
   useLive({ scope: "staff", channel, onEvent });

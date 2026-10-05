@@ -1,6 +1,6 @@
 "use client";
 
-import type { MenuTheme } from "@/generated/prisma/enums";
+import type { MenuTheme, PrepMode } from "@/generated/prisma/enums";
 import { ImageUpload } from "@/components/image-upload";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -24,6 +24,7 @@ export type SettingsValues = {
   websiteUrl: string | null;
   googleReviewUrl: string | null;
   menuTheme: MenuTheme;
+  prepMode: PrepMode;
 };
 
 const THEMES: { value: MenuTheme; label: string; hint: string; preview: string }[] = [
@@ -151,6 +152,30 @@ export function SettingsForm({ values }: { values: SettingsValues }) {
               </label>
             ))}
           </fieldset>
+        </Section>
+
+        <Section title="Cocina y barra" description="Adónde llegan los pedidos para preparar.">
+          <fieldset className="space-y-2">
+            <legend className="sr-only">Pantallas de preparación</legend>
+            {(
+              [
+                { value: "SEPARATE", label: "Cocina y barra separadas", hint: "Cada pantalla recibe lo suyo: comidas a cocina, bebidas a barra" },
+                { value: "SINGLE", label: "Una sola pantalla", hint: "Todo (comidas y bebidas) llega a Cocina. Para locales sin barra aparte" },
+              ] as const
+            ).map((o) => (
+              <label
+                key={o.value}
+                className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-3 has-[:checked]:border-brand has-[:checked]:bg-brand-soft"
+              >
+                <input type="radio" name="prepMode" value={o.value} defaultChecked={values.prepMode === o.value} className="mt-1 accent-[var(--brand)]" />
+                <span>
+                  <span className="block text-sm font-medium">{o.label}</span>
+                  <span className="block text-xs text-muted">{o.hint}</span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+          <p className="mt-2 text-xs text-muted">No hace falta tocar los productos: si un día separan la barra, se cambia acá y listo.</p>
         </Section>
 
         <Card className="space-y-3 p-4">

@@ -7,6 +7,7 @@ import { ActionButton } from "@/components/ui/action-button";
 import { requireTenantRole } from "@/lib/auth/guards";
 import { ADMIN_ROLES } from "@/lib/auth/permissions";
 import { formatPrice } from "@/lib/format";
+import { getPrepMode } from "@/lib/prep";
 import { deleteProduct } from "../../actions";
 import { ProductForm, type ProductValues } from "../../product-form";
 
@@ -14,12 +15,12 @@ export const metadata: Metadata = { title: "Producto" };
 
 /** `/admin/carta/producto/nuevo` crea; `/admin/carta/producto/<id>` edita. */
 export default async function ProductPage({ params, searchParams }: PageProps<"/admin/carta/producto/[id]">) {
-  const { tdb } = await requireTenantRole(ADMIN_ROLES);
+  const { tdb, tenant } = await requireTenantRole(ADMIN_ROLES);
   const { id } = await params;
   const { categoria } = await searchParams;
   const isNew = id === "nuevo";
 
-  const [categories, groups, product] = await Promise.all([
+  const [categories, groups, product, prepMode] = await Promise.all([
     tdb.category.findMany({ orderBy: { sortOrder: "asc" }, select: { id: true, name: true } }),
     tdb.modifierGroup.findMany({
       where: { ownerProductId: null },
@@ -32,6 +33,7 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
           where: { id },
           include: { modifierGroups: true, ownGroup: { include: { options: { orderBy: { sortOrder: "asc" } } } } },
         }),
+    getPrepMode(tenant.id),
   ]);
   if (!isNew && !product) notFound();
   if (categories.length === 0) notFound();
@@ -87,6 +89,7 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
         }
       />
       <ProductForm
+        singleScreen={prepMode === "SINGLE"}
         values={values}
         categories={categories}
         groups={groups.map((g) => ({

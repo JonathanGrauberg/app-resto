@@ -39,7 +39,9 @@ export function ProductForm({
   values,
   categories,
   groups,
+  singleScreen = false,
 }: {
+  singleScreen?: boolean;
   values: ProductValues;
   categories: { id: string; name: string }[];
   groups: { id: string; name: string; summary: string }[];
@@ -92,7 +94,11 @@ export function ProductForm({
 
         <Card className="p-4 sm:p-6">
           <h2 className="font-semibold">¿Dónde se prepara?</h2>
-          <p className="mb-3 text-sm text-muted">Define a qué pantalla llega cuando se pide.</p>
+          <p className="mb-3 text-sm text-muted">
+            {singleScreen
+              ? "Tu local usa una sola pantalla: lo de Cocina y lo de Bar llega a Cocina. Igual conviene marcarlo, por si un día separan la barra."
+              : "Define a qué pantalla llega cuando se pide."}
+          </p>
           <div className="grid gap-2 sm:grid-cols-3">
             {STATIONS.map((s) => (
               <label

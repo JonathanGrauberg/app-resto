@@ -4,11 +4,13 @@ import { logout } from "@/app/login/actions";
 import { StaffLive } from "@/components/staff-live";
 import { requireTenantRole } from "@/lib/auth/guards";
 import { ADMIN_ROLES, CAN_MANAGE_TABLES, ROLE_LABEL, STAFF_MANAGER_ROLES, STAFF_ROLES } from "@/lib/auth/permissions";
+import { getPrepMode } from "@/lib/prep";
 import { staffChannel } from "@/lib/realtime/server";
 
 /** PWA del personal: cabecera compacta, sin barra lateral, pensada para celular y tablet. */
 export default async function StaffLayout({ children }: LayoutProps<"/staff">) {
   const { tenant, user, membership } = await requireTenantRole(STAFF_ROLES);
+  const prepMode = await getPrepMode(tenant.id);
 
   return (
     <div className="flex min-h-dvh flex-1 flex-col">
@@ -35,9 +37,11 @@ export default async function StaffLayout({ children }: LayoutProps<"/staff">) {
               <Link href="/staff/cocina" className="hidden rounded-lg px-3 py-2 hover:bg-ink/5 sm:block">
                 Cocina
               </Link>
-              <Link href="/staff/bar" className="hidden rounded-lg px-3 py-2 hover:bg-ink/5 sm:block">
-                Bar
-              </Link>
+              {prepMode === "SEPARATE" && (
+                <Link href="/staff/bar" className="hidden rounded-lg px-3 py-2 hover:bg-ink/5 sm:block">
+                  Bar
+                </Link>
+              )}
               <Link href="/admin" className="rounded-lg px-3 py-2 hover:bg-ink/5">
                 Admin
               </Link>
@@ -56,6 +60,7 @@ export default async function StaffLayout({ children }: LayoutProps<"/staff">) {
         membershipId={membership.id}
         role={membership.role}
         salaHref={membership.role === "CAJA" ? "/staff/caja" : "/staff/mozo"}
+        singleScreen={prepMode === "SINGLE"}
       />
     </div>
   );

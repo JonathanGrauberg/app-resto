@@ -8,6 +8,7 @@ import { requireTenantRole } from "@/lib/auth/guards";
 import { CAN_MANAGE_TABLES } from "@/lib/auth/permissions";
 import { notifyStaff, notifyTable } from "@/lib/realtime/server";
 import { buildModifiers, unitPrice, type Modifier } from "@/lib/order-lines";
+import { getPrepMode, routeStations } from "@/lib/prep";
 import { ensureReceipt } from "@/lib/receipt";
 import { tableLabelOf } from "@/lib/table-session";
 import type { TenantDb } from "@/lib/tenant-db";
@@ -404,7 +405,7 @@ export async function acceptOrder(orderId: string): Promise<ActionState> {
   // Lo que no se prepara (agua, una lata…) queda listo para que el mozo lo lleve directo.
   await tdb.orderItem.updateMany({ where: { orderId, station: "NONE" }, data: { status: "READY", readyAt: new Date() } });
   await notifyStaff(tenant.id, { type: "order.updated", sessionId: order.sessionId, orderId });
-  const stations = [...new Set(order.items.map((i) => i.station))].filter((s): s is "KITCHEN" | "BAR" => s !== "NONE");
+  const stations = routeStations(await getPrepMode(tenant.id), order.items.map((i) => i.station));
   if (stations.length) {
     await notifyStaff(tenant.id, { type: "kitchen.new", tableLabel: await tableLabelOf(tdb, order.session.table), stations });
   }
@@ -530,7 +531,7 @@ export async function createStaffOrder(sessionId: string, lines: StaffOrderLine[
   });
 
   const label = await tableLabelOf(tdb, session.table);
-  const stations = [...new Set(items.map((i) => i.station))].filter((s): s is "KITCHEN" | "BAR" => s !== "NONE");
+  const stations = routeStations(await getPrepMode(tenant.id), items.map((i) => i.station));
   if (stations.length) await notifyStaff(tenant.id, { type: "kitchen.new", tableLabel: label, stations });
   await notifyStaff(tenant.id, { type: "order.updated", sessionId, orderId: order.id });
   await notifyTable(tenant.id, sessionId, { type: "order", orderId: order.id });

@@ -1,9 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { PrepStation, Role } from "@/generated/prisma/enums";
+import type { Role } from "@/generated/prisma/enums";
 import type { ActionState } from "@/lib/actions";
 import { requireTenantRole } from "@/lib/auth/guards";
+import { editableStations, getPrepMode } from "@/lib/prep";
 import { notifyStaff, notifyTable } from "@/lib/realtime/server";
 import { tableLabelOf } from "@/lib/table-session";
 import type { TenantDb } from "@/lib/tenant-db";
@@ -16,20 +17,15 @@ import type { TenantDb } from "@/lib/tenant-db";
 const KITCHEN_ROLES: Role[] = ["OWNER", "ADMIN", "COCINA", "BAR"];
 const DELIVER_ROLES: Role[] = ["OWNER", "ADMIN", "CAJA", "MOZO"];
 
-/** Cocina solo toca platos de cocina; bar, los de bar. Dueño/admin, cualquiera. */
-function allowedStation(role: Role): PrepStation | null {
-  if (role === "COCINA") return "KITCHEN";
-  if (role === "BAR") return "BAR";
-  return null; // sin restricción
-}
 
 const ok = (message: string): ActionState => ({ ok: message, at: Date.now() });
 const err = (message: string): ActionState => ({ error: message });
 
-async function loadItems(tdb: TenantDb, itemIds: string[], role: Role) {
-  const station = allowedStation(role);
+/** Cocina solo toca lo suyo (en modo "una sola pantalla", todo); dueño/admin, cualquiera. */
+async function loadItems(tdb: TenantDb, tenantId: string, itemIds: string[], role: Role) {
+  const stations = editableStations(await getPrepMode(tenantId), role);
   return tdb.orderItem.findMany({
-    where: { id: { in: itemIds }, ...(station ? { station } : {}), order: { status: "ACCEPTED" } },
+    where: { id: { in: itemIds }, ...(stations ? { station: { in: stations } } : {}), order: { status: "ACCEPTED" } },
     include: { order: { include: { session: { include: { table: true } } } } },
   });
 }
@@ -41,7 +37,7 @@ function refresh() {
 
 export async function startItems(itemIds: string[]): Promise<ActionState> {
   const { tdb, tenant, membership } = await requireTenantRole(KITCHEN_ROLES);
-  const items = await loadItems(tdb, itemIds, membership.role);
+  const items = await loadItems(tdb, tenant.id, itemIds, membership.role);
   const ids = items.filter((i) => i.status === "PENDING").map((i) => i.id);
   if (!ids.length) return ok("Sin cambios");
   await tdb.orderItem.updateMany({ where: { id: { in: ids } }, data: { status: "IN_PREPARATION" } });
@@ -54,7 +50,7 @@ export async function startItems(itemIds: string[]): Promise<ActionState> {
 /** ¡Listo! Avisa al mozo de la mesa (o a todos si no tiene) para que lo lleve. */
 export async function readyItems(itemIds: string[]): Promise<ActionState> {
   const { tdb, tenant, membership } = await requireTenantRole(KITCHEN_ROLES);
-  const items = await loadItems(tdb, itemIds, membership.role);
+  const items = await loadItems(tdb, tenant.id, itemIds, membership.role);
   const ready = items.filter((i) => i.status === "PENDING" || i.status === "IN_PREPARATION");
   if (!ready.length) return ok("Sin cambios");
   await tdb.orderItem.updateMany({ where: { id: { in: ready.map((i) => i.id) } }, data: { status: "READY", readyAt: new Date() } });
@@ -81,7 +77,7 @@ export async function readyItems(itemIds: string[]): Promise<ActionState> {
 /** Por si se marcó "listo" sin querer. */
 export async function undoReady(itemIds: string[]): Promise<ActionState> {
   const { tdb, tenant, membership } = await requireTenantRole(KITCHEN_ROLES);
-  const items = await loadItems(tdb, itemIds, membership.role);
+  const items = await loadItems(tdb, tenant.id, itemIds, membership.role);
   const ids = items.filter((i) => i.status === "READY").map((i) => i.id);
   if (!ids.length) return ok("Sin cambios");
   await tdb.orderItem.updateMany({ where: { id: { in: ids } }, data: { status: "IN_PREPARATION", readyAt: null } });

@@ -31,7 +31,16 @@ function urgency(fromIso: string, now: number | null) {
   return "";
 }
 
-export function KdsBoard({ orders, station }: { orders: KdsOrder[]; station: "KITCHEN" | "BAR" }) {
+export function KdsBoard({
+  orders,
+  station,
+  single = false,
+}: {
+  orders: KdsOrder[];
+  station: "KITCHEN" | "BAR";
+  /** Local con una sola pantalla: cocina recibe también lo de barra. */
+  single?: boolean;
+}) {
   const now = useNow(20_000);
   const Icon = station === "BAR" ? Wine : ChefHat;
   const byColumn = (c: Column) => orders.filter((o) => columnOf(o) === c);
@@ -42,6 +51,7 @@ export function KdsBoard({ orders, station }: { orders: KdsOrder[]; station: "KI
         <h1 className="flex items-center gap-2 text-2xl font-bold">
           <Icon className="size-7" aria-hidden /> {station === "BAR" ? "Barra" : "Cocina"}
         </h1>
+        {single && <span className="rounded-full bg-brand-soft px-2.5 py-0.5 text-xs font-medium text-brand">Comidas y bebidas</span>}
         <span className="text-sm text-muted">
           {orders.length === 1 ? "1 pedido activo" : `${orders.length} pedidos activos`} · se actualiza solo
         </span>

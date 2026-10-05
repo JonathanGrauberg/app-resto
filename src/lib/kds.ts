@@ -6,18 +6,18 @@ import type { TenantDb } from "@/lib/tenant-db";
  * Pantalla de cocina / bar (KDS): pedidos ya aceptados por el mozo, de una estación,
  * agrupados por pedido de mesa. Los "listos" quedan visibles hasta que el mozo los entrega.
  */
-export async function getKdsData(tdb: TenantDb, station: PrepStation) {
+export async function getKdsData(tdb: TenantDb, stations: PrepStation[]) {
   const orders = await tdb.order.findMany({
     where: {
       status: "ACCEPTED",
       // Solo mesas abiertas: una mesa cobrada no puede quedar "colgada" en cocina.
       session: { status: { not: "CLOSED" } },
-      items: { some: { station, status: { in: ["PENDING", "IN_PREPARATION", "READY"] } } },
+      items: { some: { station: { in: stations }, status: { in: ["PENDING", "IN_PREPARATION", "READY"] } } },
     },
     orderBy: { acceptedAt: "asc" },
     include: {
       items: {
-        where: { station, status: { in: ["PENDING", "IN_PREPARATION", "READY"] } },
+        where: { station: { in: stations }, status: { in: ["PENDING", "IN_PREPARATION", "READY"] } },
         orderBy: { id: "asc" },
       },
       session: {

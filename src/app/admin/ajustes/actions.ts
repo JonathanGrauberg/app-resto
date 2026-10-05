@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { MenuTheme } from "@/generated/prisma/enums";
+import { MenuTheme, PrepMode } from "@/generated/prisma/enums";
 import { fail, optionalText, optionalUrl, success, type ActionState } from "@/lib/actions";
 import { requireTenantRole } from "@/lib/auth/guards";
 import { ADMIN_ROLES } from "@/lib/auth/permissions";
@@ -20,6 +20,7 @@ const schema = z.object({
   websiteUrl: optionalUrl,
   googleReviewUrl: optionalUrl,
   menuTheme: z.enum(MenuTheme),
+  prepMode: z.enum(PrepMode),
   coverKey: z.string().default(""),
   logoKey: z.string().default(""),
   shareKey: z.string().default(""),
