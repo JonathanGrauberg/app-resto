@@ -17,7 +17,11 @@ export type StaffEvent =
   | { type: "table"; tableId?: string } // cambió el estado de una mesa (abrir, juntar, cerrar…)
   | { type: "order.created"; tableLabel: string; sessionId: string; orderId: string; noWaiter: boolean; waiterId: string | null }
   | { type: "order.updated"; sessionId: string; orderId: string }
-  | { type: "waiter.called"; tableLabel: string; sessionId: string; waiterId: string | null };
+  | { type: "waiter.called"; tableLabel: string; sessionId: string; waiterId: string | null }
+  // Pedido aceptado: suena en las pantallas de las estaciones que tienen platos para preparar.
+  | { type: "kitchen.new"; tableLabel: string; stations: ("KITCHEN" | "BAR")[] }
+  // Cocina/bar terminó: el mozo de la mesa tiene que llevarlo.
+  | { type: "item.ready"; tableLabel: string; sessionId: string; waiterId: string | null; station: string; summary: string };
 
 export type TableEvent =
   | { type: "cart" } // alguien de la mesa cambió el carrito

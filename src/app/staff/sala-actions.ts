@@ -8,6 +8,7 @@ import { requireTenantRole } from "@/lib/auth/guards";
 import { CAN_MANAGE_TABLES } from "@/lib/auth/permissions";
 import { notifyStaff, notifyTable } from "@/lib/realtime/server";
 import { ensureReceipt } from "@/lib/receipt";
+import { tableLabelOf } from "@/lib/table-session";
 import type { TenantDb } from "@/lib/tenant-db";
 
 /**
@@ -206,6 +207,14 @@ async function finish(tdb: TenantDb, sessionId: string, ids: string[]) {
   const fixed = tables.filter((t) => !t.temporary);
 
   await tdb.$transaction(async (tx) => {
+    // Al cerrar la mesa no queda nada pendiente: lo aceptado se da por entregado y lo no aceptado se rechaza.
+    await tx.orderItem.updateMany({
+      where: { order: { sessionId, status: "ACCEPTED" }, status: { in: ["PENDING", "IN_PREPARATION", "READY"] } },
+      data: { status: "DELIVERED", deliveredAt: new Date() },
+    });
+    await tx.order.updateMany({ where: { sessionId, status: "ACCEPTED" }, data: { status: "COMPLETED" } });
+    await tx.order.updateMany({ where: { sessionId, status: "PENDING" }, data: { status: "REJECTED", rejectReason: "Mesa cerrada" } });
+
     // Si la sesión quedó en una mesa extra pero había mesas fijas, el historial pasa a una fija.
     const mainIsExtra = extras.some((t) => t.id === session.tableId);
     if (mainIsExtra && fixed.length) {
@@ -368,7 +377,10 @@ export async function removeExtraTable(tableId: string): Promise<ActionState> {
 // ─────────────────────────────────────────────────────────────
 
 async function orderWithSession(tdb: TenantDb, orderId: string) {
-  return tdb.order.findUnique({ where: { id: orderId }, include: { session: true } });
+  return tdb.order.findUnique({
+    where: { id: orderId },
+    include: { session: { include: { table: true } }, items: { select: { station: true } } },
+  });
 }
 
 /** El mozo valida el pedido: pasa a cocina/bar. Si la mesa no tenía mozo, queda asignada a quien lo acepta. */
@@ -388,7 +400,13 @@ export async function acceptOrder(orderId: string): Promise<ActionState> {
   if (!order.session.waiterId && membership.role === "MOZO") {
     await tdb.tableSession.update({ where: { id: order.sessionId }, data: { waiterId: membership.id } });
   }
+  // Lo que no se prepara (agua, una lata…) queda listo para que el mozo lo lleve directo.
+  await tdb.orderItem.updateMany({ where: { orderId, station: "NONE" }, data: { status: "READY", readyAt: new Date() } });
   await notifyStaff(tenant.id, { type: "order.updated", sessionId: order.sessionId, orderId });
+  const stations = [...new Set(order.items.map((i) => i.station))].filter((s): s is "KITCHEN" | "BAR" => s !== "NONE");
+  if (stations.length) {
+    await notifyStaff(tenant.id, { type: "kitchen.new", tableLabel: await tableLabelOf(tdb, order.session.table), stations });
+  }
   await notifyTable(tenant.id, order.sessionId, { type: "order", orderId });
   revalidatePath("/staff", "layout");
   revalidatePath("/admin", "layout");

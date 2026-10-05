@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, ReceiptText, X } from "lucide-react";
+import { Check, HandPlatter, ReceiptText, X } from "lucide-react";
 import { cn, formatPrice } from "@/lib/format";
 import { itemPhase, PHASE_LABEL } from "@/lib/item-status";
 import { groupByPerson } from "@/lib/people";
 import type { SalaSession } from "@/lib/sala";
 import { acceptOrder, rejectOrder } from "@/app/staff/sala-actions";
+import { deliverItems } from "@/app/staff/kds-actions";
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 
@@ -27,6 +28,7 @@ export function OrdersSection({ session, onDone }: { session: SalaSession; onDon
     .filter((o) => o.status !== "PENDING")
     .flatMap((o) => o.items.map((i) => ({ ...i, phase: itemPhase(o.status, i.status) })));
   const total = consumed.reduce((n, i) => n + i.unitPriceCents * i.quantity, 0);
+  const readyIds = consumed.filter((i) => i.phase === "ready").map((i) => i.id);
 
   const run = (fn: () => Promise<{ error?: string } | undefined>) =>
     start(async () => {
@@ -110,6 +112,16 @@ export function OrdersSection({ session, onDone }: { session: SalaSession; onDon
         </div>
       ))}
 
+      {readyIds.length > 0 && (
+        <button
+          onClick={() => run(() => deliverItems(readyIds))}
+          disabled={pending}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-ok py-3 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          <HandPlatter className="size-4" aria-hidden /> Entregué lo listo ({readyIds.length})
+        </button>
+      )}
+
       {/* 2) Consumo de la mesa */}
       {consumed.length > 0 && (
         <div>
@@ -139,7 +151,18 @@ export function OrdersSection({ session, onDone }: { session: SalaSession; onDon
                           {i.modifiers.length > 0 && <span className="block text-xs text-muted">{i.modifiers.join(", ")}</span>}
                           {i.notes && <span className="block text-xs italic text-warn">“{i.notes}”</span>}
                         </span>
-                        <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium", ph.className)}>{ph.label}</span>
+                        {i.phase === "ready" ? (
+                          <button
+                            onClick={() => run(() => deliverItems([i.id]))}
+                            disabled={pending}
+                            className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium", ph.className)}
+                            title="Marcar como entregado"
+                          >
+                            {ph.label} · Entregar
+                          </button>
+                        ) : (
+                          <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium", ph.className)}>{ph.label}</span>
+                        )}
                         <span className="w-16 shrink-0 text-right tabular-nums text-muted">
                           {formatPrice(i.unitPriceCents * i.quantity)}
                         </span>

@@ -2,18 +2,18 @@
 
 import Link from "next/link";
 import { useCallback, useRef, useState } from "react";
-import { BellRing, ReceiptText, X } from "lucide-react";
+import { BellRing, HandPlatter, ReceiptText, X } from "lucide-react";
 import type { Role } from "@/generated/prisma/enums";
 import { useLive } from "@/lib/realtime/use-live";
 
-type Toast = { id: number; kind: "order" | "call"; title: string; detail: string };
+type Toast = { id: number; kind: "order" | "call" | "ready"; title: string; detail: string };
 
 /** Dos tonos cortos con Web Audio (sin archivos). Los navegadores lo permiten tras el primer toque en la página. */
 function chime(kind: Toast["kind"]) {
   try {
     const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     const ctx = new Ctx();
-    const notes = kind === "order" ? [880, 1175] : [660, 660];
+    const notes = kind === "order" ? [880, 1175] : kind === "ready" ? [1047, 1319, 1568] : [660, 660];
     notes.forEach((freq, i) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -60,7 +60,14 @@ export function StaffLive({
 
   const onEvent = useCallback(
     (e: Record<string, unknown>) => {
-      if (role === "COCINA" || role === "BAR") return; // la cocina tiene su propia pantalla (KDS)
+      // Cocina / bar: solo pedidos aceptados con platos de su estación.
+      if (role === "COCINA" || role === "BAR") {
+        const mine = role === "COCINA" ? "KITCHEN" : "BAR";
+        if (e.type === "kitchen.new" && (e.stations as string[] | undefined)?.includes(mine)) {
+          push({ kind: "order", title: `Nuevo pedido · Mesa ${e.tableLabel}`, detail: "Aparece en Nuevos" });
+        }
+        return;
+      }
       const waiterId = (e.waiterId as string | null | undefined) ?? null;
       const relevant = role !== "MOZO" || !waiterId || waiterId === membershipId;
       if (!relevant) return;
@@ -70,6 +77,9 @@ export function StaffLive({
           title: `Pedido nuevo · Mesa ${e.tableLabel}`,
           detail: e.noWaiter ? "Mesa sin mozo: ¿quién la toma?" : "Revisalo y aceptalo para que pase a cocina",
         });
+      }
+      if (e.type === "item.ready") {
+        push({ kind: "ready", title: `¡Listo para llevar! · Mesa ${e.tableLabel}`, detail: String(e.summary ?? "") });
       }
       if (e.type === "waiter.called") {
         push({ kind: "call", title: `Mesa ${e.tableLabel} llama al mozo`, detail: waiterId ? "" : "La mesa no tiene mozo asignado" });
@@ -93,10 +103,18 @@ export function StaffLive({
             className={
               t.kind === "order"
                 ? "flex size-9 shrink-0 items-center justify-center rounded-full bg-brand text-brand-ink"
-                : "flex size-9 shrink-0 items-center justify-center rounded-full bg-warn text-white"
+                : t.kind === "ready"
+                  ? "flex size-9 shrink-0 items-center justify-center rounded-full bg-ok text-white"
+                  : "flex size-9 shrink-0 items-center justify-center rounded-full bg-warn text-white"
             }
           >
-            {t.kind === "order" ? <ReceiptText className="size-5" aria-hidden /> : <BellRing className="size-5" aria-hidden />}
+            {t.kind === "order" ? (
+              <ReceiptText className="size-5" aria-hidden />
+            ) : t.kind === "ready" ? (
+              <HandPlatter className="size-5" aria-hidden />
+            ) : (
+              <BellRing className="size-5" aria-hidden />
+            )}
           </span>
           <Link href={salaHref} className="min-w-0 flex-1" onClick={() => setToasts((p) => p.filter((x) => x.id !== t.id))}>
             <p className="font-semibold leading-tight">{t.title}</p>

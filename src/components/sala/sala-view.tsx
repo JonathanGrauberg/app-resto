@@ -45,7 +45,8 @@ export function SalaView({
     const noWaiter = data.sessions.filter((s) => s.status === "OPEN" && !s.waiterId).length;
     const toAccept = data.sessions.reduce((n, s) => n + s.pendingOrders, 0);
     const calling = data.sessions.filter((s) => s.waiterCalledAt).length;
-    return { free, pending, open, guests, noWaiter, toAccept, calling };
+    const toDeliver = data.sessions.reduce((n, s) => n + s.readyItems, 0);
+    return { free, pending, open, guests, noWaiter, toAccept, calling, toDeliver };
   }, [allTables, data.sessions]);
 
   if (!area) {
@@ -116,6 +117,11 @@ export function SalaView({
         {stats.toAccept > 0 && (
           <span className="rounded-full bg-danger px-2.5 py-0.5 text-xs font-semibold text-white">
             {stats.toAccept} {stats.toAccept === 1 ? "pedido" : "pedidos"} por aceptar
+          </span>
+        )}
+        {stats.toDeliver > 0 && (
+          <span className="rounded-full bg-ok px-2.5 py-0.5 text-xs font-semibold text-white">
+            {stats.toDeliver} {stats.toDeliver === 1 ? "plato listo" : "platos listos"} para llevar
           </span>
         )}
         {stats.calling > 0 && (
@@ -305,6 +311,14 @@ export function SalaView({
                     session.status === "OPEN" && (
                       <span className="absolute -right-1 -top-1 size-3 rounded-full bg-warn ring-2 ring-surface" title="Sin mozo" />
                     )
+                  )}
+                  {session && session.readyItems > 0 && (
+                    <span
+                      className="absolute -left-2 -top-2 flex min-w-5 items-center justify-center rounded-full bg-ok px-1 text-[11px] font-bold text-white ring-2 ring-surface"
+                      title="Platos listos para llevar"
+                    >
+                      {session.readyItems}
+                    </span>
                   )}
                   {session?.waiterCalledAt && (
                     <span

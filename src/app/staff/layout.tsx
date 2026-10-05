@@ -31,9 +31,17 @@ export default async function StaffLayout({ children }: LayoutProps<"/staff">) {
             </Link>
           )}
           {ADMIN_ROLES.includes(membership.role) && (
-            <Link href="/admin" className="rounded-lg px-3 py-2 hover:bg-ink/5">
-              Admin
-            </Link>
+            <>
+              <Link href="/staff/cocina" className="hidden rounded-lg px-3 py-2 hover:bg-ink/5 sm:block">
+                Cocina
+              </Link>
+              <Link href="/staff/bar" className="hidden rounded-lg px-3 py-2 hover:bg-ink/5 sm:block">
+                Bar
+              </Link>
+              <Link href="/admin" className="rounded-lg px-3 py-2 hover:bg-ink/5">
+                Admin
+              </Link>
+            </>
           )}
         </nav>
         <form action={logout}>

@@ -58,6 +58,9 @@ export async function getSalaData(tdb: TenantDb) {
       waiterName: s.waiter?.user.name ?? null,
       waiterCalledAt: s.waiterCalledAt?.toISOString() ?? null,
       pendingOrders: s.orders.filter((o) => o.status === "PENDING").length,
+      readyItems: s.orders
+        .filter((o) => o.status === "ACCEPTED")
+        .reduce((n, o) => n + o.items.filter((i) => i.status === "READY").length, 0),
       orders: s.orders.map((o) => ({
         id: o.id,
         round: o.round,

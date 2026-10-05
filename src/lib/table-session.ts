@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { readDiner, type Diner } from "@/lib/diner";
-import { tenantDb } from "@/lib/tenant-db";
+import { tenantDb, type TenantDb } from "@/lib/tenant-db";
 
 /**
  * Contexto de una mesa a partir del QR: local, mesa, mesas juntadas y sesión abierta.
@@ -87,3 +87,13 @@ export async function dinerTableState(ctx: TableContext) {
 }
 
 export type DinerTableState = Awaited<ReturnType<typeof dinerTableState>>;
+
+/** Nombre de la mesa incluyendo las juntadas ("3+4"). */
+export async function tableLabelOf(tdb: TenantDb, table: { number: string; groupId: string | null }) {
+  if (!table.groupId) return table.number;
+  const members = await tdb.table.findMany({ where: { groupId: table.groupId }, select: { number: true } });
+  return members
+    .map((m) => m.number)
+    .sort((a, b) => a.localeCompare(b, "es", { numeric: true }))
+    .join("+");
+}

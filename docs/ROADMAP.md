@@ -143,7 +143,7 @@ Comensales (carrito compartido en vivo) ─enviar─► PENDIENTE
 - ✅ **Fase 0** — Fundaciones (en local; falta repo/CI y deploy, a cargo del equipo)
 - ✅ **Fase 1** — Configuración del restaurante, con fotos de productos, portada (primera imagen del hero), logo (ícono de pestaña) e imagen para compartir en WhatsApp/redes, en R2 (UE)
 - 🟡 **Fase 4** — Caja: cuenta (pre-cuenta) imprimible en térmica de 80 mm con QR al detalle por persona y calculadora para dividir (vigente 24 h tras pagar), "Ver la cuenta" en el celular al pedir cobrar, mesas cobradas hoy con reimpresión, total guardado para métricas. Falta: forma de pago, propinas, descuentos/invitaciones, cierre de turno.
-- 🟡 **Fase 3** — Sala en vivo lista: abrir/cerrar mesa, comensales (se puede superar el tope), mozo asignado, juntar/separar mesas ("3+4"), mesas extra temporales ("2+X1", se retiran solas al cobrar), QR por mesa en pantalla, pendiente de cobro → caja confirma. Pedidos con aceptar/rechazar del mozo y avisos en vivo con sonido. Faltan pantallas de cocina/bar (KDS), "plato listo" y pedido cargado por el mozo.
+- 🟡 **Fase 3** — Sala en vivo lista: abrir/cerrar mesa, comensales (se puede superar el tope), mozo asignado, juntar/separar mesas ("3+4"), mesas extra temporales ("2+X1", se retiran solas al cobrar), QR por mesa en pantalla, pendiente de cobro → caja confirma. Pedidos con aceptar/rechazar del mozo y avisos en vivo con sonido. Pantallas de cocina y bar (Nuevos → En preparación → ¡Listos!, tiempos con alerta a los 10/20 min, notas resaltadas), aviso "listo para llevar" al mozo y entrega desde su panel. Falta: pedido cargado por el mozo.
 - ✅ **Fase 2** — Comensal: se une a la mesa por QR (con apodo), carrito compartido en vivo con quién pidió qué, rondas de pedido, llamar al mozo, invitación a reseña en Google. Tiempo real con Ably (avisos con sonido al personal).
 
 Todo entra en la v1. Las fases siguen el **orden de dependencias**: cada una deja algo funcional y desplegado.
@@ -236,6 +236,7 @@ Todo entra en la v1. Las fases siguen el **orden de dependencias**: cada una dej
 | — | Migración de infraestructura si el volumen lo justifica |
 
 ### Ideas para charlar (propuestas del equipo, 2026-10-02)
+- **Modo kiosco (tablet compartida)**: una tablet fija en el local donde cada empleado toca su nombre + PIN, opera (sala, pedidos, caja) y la sesión se cierra sola tras unos segundos sin uso. Para quien no lleva celular o si el dueño no quiere celulares en servicio. Reutiliza el login por PIN que ya existe.
 - **Calculadora / "¿Dividir?" para el mozo**: al ver el total de la mesa, botón para dividir en partes iguales ("¿cuánto es cada uno?").
 - **División por consumo** (opcional, nunca obligatoria; siempre queda la opción simple):
   - Cada comensal marca lo que consumió (o pide desde su propio celular y queda a su nombre).
