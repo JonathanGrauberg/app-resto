@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { Role } from "@/generated/prisma/enums";
 import type { ActionState } from "@/lib/actions";
 import { requireTenantRole } from "@/lib/auth/guards";
+import type { WithRoles } from "@/lib/auth/permissions";
 import { editableStations, getPrepMode } from "@/lib/prep";
 import { notifyStaff, notifyTable } from "@/lib/realtime/server";
 import { tableLabelOf } from "@/lib/table-session";
@@ -22,8 +23,8 @@ const ok = (message: string): ActionState => ({ ok: message, at: Date.now() });
 const err = (message: string): ActionState => ({ error: message });
 
 /** Cocina solo toca lo suyo (en modo "una sola pantalla", todo); dueño/admin, cualquiera. */
-async function loadItems(tdb: TenantDb, tenantId: string, itemIds: string[], role: Role) {
-  const stations = editableStations(await getPrepMode(tenantId), role);
+async function loadItems(tdb: TenantDb, tenantId: string, itemIds: string[], m: WithRoles) {
+  const stations = editableStations(await getPrepMode(tenantId), m);
   return tdb.orderItem.findMany({
     where: { id: { in: itemIds }, ...(stations ? { station: { in: stations } } : {}), order: { status: "ACCEPTED" } },
     include: { order: { include: { session: { include: { table: true } } } } },
@@ -37,7 +38,7 @@ function refresh() {
 
 export async function startItems(itemIds: string[]): Promise<ActionState> {
   const { tdb, tenant, membership } = await requireTenantRole(KITCHEN_ROLES);
-  const items = await loadItems(tdb, tenant.id, itemIds, membership.role);
+  const items = await loadItems(tdb, tenant.id, itemIds, membership);
   const ids = items.filter((i) => i.status === "PENDING").map((i) => i.id);
   if (!ids.length) return ok("Sin cambios");
   await tdb.orderItem.updateMany({ where: { id: { in: ids } }, data: { status: "IN_PREPARATION" } });
@@ -50,7 +51,7 @@ export async function startItems(itemIds: string[]): Promise<ActionState> {
 /** ¡Listo! Avisa al mozo de la mesa (o a todos si no tiene) para que lo lleve. */
 export async function readyItems(itemIds: string[]): Promise<ActionState> {
   const { tdb, tenant, membership } = await requireTenantRole(KITCHEN_ROLES);
-  const items = await loadItems(tdb, tenant.id, itemIds, membership.role);
+  const items = await loadItems(tdb, tenant.id, itemIds, membership);
   const ready = items.filter((i) => i.status === "PENDING" || i.status === "IN_PREPARATION");
   if (!ready.length) return ok("Sin cambios");
   await tdb.orderItem.updateMany({ where: { id: { in: ready.map((i) => i.id) } }, data: { status: "READY", readyAt: new Date() } });
@@ -77,7 +78,7 @@ export async function readyItems(itemIds: string[]): Promise<ActionState> {
 /** Por si se marcó "listo" sin querer. */
 export async function undoReady(itemIds: string[]): Promise<ActionState> {
   const { tdb, tenant, membership } = await requireTenantRole(KITCHEN_ROLES);
-  const items = await loadItems(tdb, tenant.id, itemIds, membership.role);
+  const items = await loadItems(tdb, tenant.id, itemIds, membership);
   const ids = items.filter((i) => i.status === "READY").map((i) => i.id);
   if (!ids.length) return ok("Sin cambios");
   await tdb.orderItem.updateMany({ where: { id: { in: ids } }, data: { status: "IN_PREPARATION", readyAt: null } });
@@ -104,4 +105,65 @@ export async function deliverItems(itemIds: string[]): Promise<ActionState> {
   for (const sid of new Set(items.map((i) => i.order.sessionId))) await notifyTable(tenant.id, sid, { type: "order", orderId: "" });
   refresh();
   return ok("Entregado");
+}
+
+/**
+ * Cocina / barra no puede hacer un plato (falta un ingrediente, se terminó…): el plato se cancela,
+ * no se cobra, y se avisa al mozo y a la mesa. Opcional: marcarlo agotado en la carta.
+ */
+export async function cancelItems(itemIds: string[], reason: string, markSoldOut: boolean): Promise<ActionState> {
+  const { tdb, tenant, membership } = await requireTenantRole(KITCHEN_ROLES);
+  const items = (await loadItems(tdb, tenant.id, itemIds, membership)).filter(
+    (i) => i.status === "PENDING" || i.status === "IN_PREPARATION",
+  );
+  if (!items.length) return err("Ese plato ya no se puede rechazar");
+  const why = reason.trim().slice(0, 140) || "Sin stock";
+
+  await tdb.orderItem.updateMany({ where: { id: { in: items.map((i) => i.id) } }, data: { status: "CANCELLED", cancelReason: why } });
+  // Un pedido sin nada más por hacer queda completo.
+  for (const orderId of new Set(items.map((i) => i.orderId))) {
+    const open = await tdb.orderItem.count({ where: { orderId, status: { notIn: ["DELIVERED", "CANCELLED"] } } });
+    if (open === 0) await tdb.order.update({ where: { id: orderId }, data: { status: "COMPLETED" } });
+  }
+  if (markSoldOut) {
+    const productIds = [...new Set(items.map((i) => i.productId).filter((p): p is string => !!p))];
+    if (productIds.length) await tdb.product.updateMany({ where: { id: { in: productIds } }, data: { available: false } });
+    revalidatePath(`/${tenant.slug}`, "layout");
+    revalidatePath("/admin/carta");
+  }
+
+  const bySession = new Map<string, typeof items>();
+  for (const i of items) bySession.set(i.order.sessionId, [...(bySession.get(i.order.sessionId) ?? []), i]);
+  for (const [sessionId, list] of bySession) {
+    const session = list[0].order.session;
+    await notifyStaff(tenant.id, {
+      type: "item.cancelled",
+      tableLabel: await tableLabelOf(tdb, session.table),
+      sessionId,
+      waiterId: session.waiterId,
+      summary: list.map((i) => `${i.quantity}× ${i.name}`).join(", "),
+      reason: why,
+    });
+    await notifyTable(tenant.id, sessionId, { type: "order", orderId: list[0].orderId });
+  }
+  refresh();
+  return ok(markSoldOut ? "Rechazado y marcado agotado en la carta" : "Rechazado. Avisamos al mozo");
+}
+
+/** Cocina / barra llama al mozo (de una mesa en particular, o a cualquiera) por una consulta. */
+export async function callWaiterFromKitchen(orderId: string | null, message: string, from: "KITCHEN" | "BAR"): Promise<ActionState> {
+  const { tdb, tenant } = await requireTenantRole(KITCHEN_ROLES);
+  const text = message.trim().slice(0, 140) || "Pasá por la cocina";
+  let tableLabel: string | null = null;
+  let waiterId: string | null = null;
+  let sessionId: string | null = null;
+  if (orderId) {
+    const order = await tdb.order.findUnique({ where: { id: orderId }, include: { session: { include: { table: true } } } });
+    if (!order) return err("Pedido no encontrado");
+    tableLabel = await tableLabelOf(tdb, order.session.table);
+    waiterId = order.session.waiterId;
+    sessionId = order.sessionId;
+  }
+  await notifyStaff(tenant.id, { type: "kitchen.call", tableLabel, waiterId, sessionId, message: text, from });
+  return ok(waiterId ? "Avisamos al mozo de la mesa" : "Avisamos a los mozos");
 }

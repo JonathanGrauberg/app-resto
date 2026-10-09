@@ -27,7 +27,10 @@ export function OrdersSection({ session, onDone }: { session: SalaSession; onDon
   const consumed = session.orders
     .filter((o) => o.status !== "PENDING")
     .flatMap((o) => o.items.map((i) => ({ ...i, phase: itemPhase(o.status, i.status) })));
-  const total = consumed.reduce((n, i) => n + i.unitPriceCents * i.quantity, 0);
+  // Lo que cocina no pudo hacer no se cobra.
+  const charged = (list: typeof consumed) =>
+    list.filter((i) => i.phase !== "cancelled").reduce((n, i) => n + i.unitPriceCents * i.quantity, 0);
+  const total = charged(consumed);
   const readyIds = consumed.filter((i) => i.phase === "ready").map((i) => i.id);
 
   const run = (fn: () => Promise<{ error?: string } | undefined>) =>
@@ -137,7 +140,7 @@ export function OrdersSection({ session, onDone }: { session: SalaSession; onDon
                 <p className="mb-1 flex items-baseline justify-between text-xs font-semibold uppercase tracking-wider text-muted">
                   {g.label}
                   <span className="font-normal normal-case tabular-nums">
-                    {formatPrice(g.items.reduce((n, i) => n + i.unitPriceCents * i.quantity, 0))}
+                    {formatPrice(charged(g.items))}
                   </span>
                 </p>
                 <ul className="space-y-1.5 text-sm">
@@ -150,6 +153,9 @@ export function OrdersSection({ session, onDone }: { session: SalaSession; onDon
                           {i.name}
                           {i.modifiers.length > 0 && <span className="block text-xs text-muted">{i.modifiers.join(", ")}</span>}
                           {i.notes && <span className="block text-xs italic text-warn">“{i.notes}”</span>}
+                          {i.phase === "cancelled" && (
+                            <span className="block text-xs text-danger">Cocina: {i.cancelReason ?? "no se pudo hacer"} · no se cobra</span>
+                          )}
                         </span>
                         {i.phase === "ready" ? (
                           <button
@@ -163,7 +169,7 @@ export function OrdersSection({ session, onDone }: { session: SalaSession; onDon
                         ) : (
                           <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium", ph.className)}>{ph.label}</span>
                         )}
-                        <span className="w-16 shrink-0 text-right tabular-nums text-muted">
+                        <span className={cn("w-16 shrink-0 text-right tabular-nums text-muted", i.phase === "cancelled" && "line-through")}>
                           {formatPrice(i.unitPriceCents * i.quantity)}
                         </span>
                       </li>

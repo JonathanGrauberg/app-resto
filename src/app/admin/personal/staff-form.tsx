@@ -13,7 +13,7 @@ import { saveStaff } from "./actions";
 export type StaffValues = {
   id?: string;
   name: string;
-  role: Role;
+  roles: Role[];
   email: string;
   hasPassword: boolean;
   hasPin: boolean;
@@ -33,9 +33,10 @@ const PANEL_ROLES: Role[] = ["OWNER", "ADMIN", "CAJA"];
 
 export function StaffForm({ values, roles, isSelf }: { values: StaffValues; roles: Role[]; isSelf: boolean }) {
   const [state, action, pending] = useFormAction(saveStaff.bind(null, values.id ?? null), undefined);
-  const [role, setRole] = useState<Role>(values.role);
+  const [picked, setPicked] = useState<Role[]>(values.roles);
   const fe = state?.fieldErrors ?? {};
-  const needsPassword = PANEL_ROLES.includes(role);
+  const needsPassword = picked.some((r) => PANEL_ROLES.includes(r));
+  const toggle = (r: Role) => setPicked((cur) => (cur.includes(r) ? cur.filter((x) => x !== r) : [...cur, r]));
 
   return (
     <form onSubmit={action} className="grid gap-6 lg:grid-cols-[1fr_320px] lg:items-start">
@@ -46,8 +47,12 @@ export function StaffForm({ values, roles, isSelf }: { values: StaffValues; role
           </Field>
 
           <fieldset>
-            <legend className="mb-1.5 text-sm font-medium">Rol</legend>
-            {isSelf && <p className="mb-2 text-xs text-muted">No podés cambiar tu propio rol.</p>}
+            <legend className="mb-1.5 text-sm font-medium">Roles</legend>
+            <p className="mb-2 text-xs text-muted">
+              {isSelf
+                ? "No podés cambiar tus propios roles."
+                : "Puede tener más de uno (ej. Caja y Mozo). Entra a la pantalla del más importante y cambia desde el menú."}
+            </p>
             <div className="grid gap-2 sm:grid-cols-2">
               {roles.map((r) => (
                 <label
@@ -55,12 +60,12 @@ export function StaffForm({ values, roles, isSelf }: { values: StaffValues; role
                   className="cursor-pointer rounded-xl border border-line p-3 has-[:checked]:border-brand has-[:checked]:bg-brand-soft has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60"
                 >
                   <input
-                    type="radio"
-                    name="role"
+                    type="checkbox"
+                    name="roles"
                     value={r}
-                    checked={role === r}
-                    onChange={() => setRole(r)}
-                    disabled={isSelf && r !== values.role}
+                    checked={picked.includes(r)}
+                    onChange={() => toggle(r)}
+                    disabled={isSelf}
                     className="sr-only"
                   />
                   <span className="block text-sm font-medium">{ROLE_LABEL[r]}</span>
@@ -68,6 +73,9 @@ export function StaffForm({ values, roles, isSelf }: { values: StaffValues; role
                 </label>
               ))}
             </div>
+            {/* Los checkboxes deshabilitados no se envían: se mandan los roles actuales. */}
+            {isSelf && values.roles.map((r) => <input key={r} type="hidden" name="roles" value={r} />)}
+            {fe.roles && <p className="mt-1.5 text-xs text-danger">{fe.roles}</p>}
           </fieldset>
         </Card>
 

@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import type { PrepStation, Role } from "@/generated/prisma/enums";
 import type { ActionState } from "@/lib/actions";
 import { requireTenantRole } from "@/lib/auth/guards";
-import { CAN_MANAGE_TABLES } from "@/lib/auth/permissions";
+import { CAN_MANAGE_TABLES, hasRole } from "@/lib/auth/permissions";
 import { notifyStaff, notifyTable } from "@/lib/realtime/server";
 import { buildModifiers, unitPrice, type Modifier } from "@/lib/order-lines";
 import { getPrepMode, routeStations } from "@/lib/prep";
@@ -21,6 +21,9 @@ import type { TenantDb } from "@/lib/tenant-db";
 
 const CASHIER_ROLES: Role[] = ["OWNER", "ADMIN", "CAJA"];
 const MAX_GUESTS = 99;
+
+/** Atiende mesas (rol Mozo, aunque además tenga otros roles). */
+const isWaiter = (m: { role: Role; extraRoles?: Role[] }) => hasRole(m, ["MOZO"]);
 
 async function auth() {
   return requireTenantRole(CAN_MANAGE_TABLES);
@@ -68,7 +71,7 @@ export async function openTable(tableId: string, guests: number): Promise<Action
       tableId,
       guests: Math.min(Math.max(1, Math.round(guests)), MAX_GUESTS),
       // El mozo que la abre queda asignado; caja/admin la abren sin mozo.
-      waiterId: membership.role === "MOZO" ? membership.id : null,
+      waiterId: isWaiter(membership) ? membership.id : null,
     },
   });
   await tdb.table.updateMany({ where: { id: { in: ids } }, data: { status: "OCCUPIED" } });
@@ -95,14 +98,14 @@ export async function assignWaiter(sessionId: string, waiterId: string | null): 
   const session = await tdb.tableSession.findUnique({ where: { id: sessionId } });
   if (!session || session.status === "CLOSED") return err("La mesa no está abierta");
 
-  if (membership.role === "MOZO") {
+  if (!hasRole(membership, CASHIER_ROLES)) {
     // Un mozo puede tomar una mesa sin mozo, o soltar la suya. No puede quitársela a otro.
     const takingFree = waiterId === membership.id && !session.waiterId;
     const releasingOwn = waiterId === null && session.waiterId === membership.id;
     if (!takingFree && !releasingOwn) return err("Esta mesa ya tiene otro mozo. Pedile a caja que la reasigne.");
   } else if (waiterId) {
     const w = await tdb.membership.findUnique({ where: { id: waiterId } });
-    if (!w || !w.active || w.role !== "MOZO") return err("Mozo no válido");
+    if (!w || !w.active || !isWaiter(w)) return err("Mozo no válido");
   }
 
   await tdb.tableSession.update({ where: { id: sessionId }, data: { waiterId } });
@@ -180,13 +183,17 @@ async function sessionTables(tdb: TenantDb, sessionId: string) {
 
 /** El mozo pide cerrar: la mesa queda pendiente de cobro y su QR deja de aceptar pedidos. */
 export async function requestClose(sessionId: string): Promise<ActionState> {
-  const { tdb, tenant } = await auth();
+  const { tdb, tenant, user, membership } = await auth();
   const st = await sessionTables(tdb, sessionId);
   if (!st) return err("La mesa no está abierta");
+  if (st.session.status === "PENDING_PAYMENT") return ok("La mesa ya está en caja");
   await tdb.tableSession.update({ where: { id: sessionId }, data: { status: "PENDING_PAYMENT", closeRequestedAt: new Date() } });
   // La cuenta (y su QR) queda lista para imprimir y para que la vean en sus celulares.
   await ensureReceipt(tdb, sessionId);
   await tdb.table.updateMany({ where: { id: { in: st.ids } }, data: { status: "PENDING_PAYMENT" } });
+  // Aviso con sonido en caja (además del cambio de color de la mesa).
+  const table = await tdb.table.findUniqueOrThrow({ where: { id: st.session.tableId } });
+  await notifyStaff(tenant.id, { type: "table.pending", tableLabel: await tableLabelOf(tdb, table), sessionId, waiterName: user.name, byId: membership.id });
   await refresh(tenant.id, sessionId);
   return ok("Mesa enviada a caja para cobrar");
 }
@@ -268,7 +275,7 @@ export type PaymentInput = {
  */
 export async function checkout(sessionId: string, payments: PaymentInput[]): Promise<ActionState> {
   const { tdb, tenant, membership } = await auth();
-  if (!CASHIER_ROLES.includes(membership.role)) return err("Solo caja puede cobrar");
+  if (!hasRole(membership, CASHIER_ROLES)) return err("Solo caja puede cobrar");
   const st = await sessionTables(tdb, sessionId);
   if (!st) return err("La mesa no está abierta");
   if (!Array.isArray(payments) || payments.length > 20) return err("Pagos no válidos");
@@ -321,7 +328,7 @@ export async function checkout(sessionId: string, payments: PaymentInput[]): Pro
 /** Mesa sin nada que cobrar (todo invitado o con descuento total): se cierra sin pagos. */
 export async function confirmPayment(sessionId: string): Promise<ActionState> {
   const { tdb, tenant, membership } = await auth();
-  if (!CASHIER_ROLES.includes(membership.role)) return err("Solo caja puede confirmar el cobro");
+  if (!hasRole(membership, CASHIER_ROLES)) return err("Solo caja puede confirmar el cobro");
   const st = await sessionTables(tdb, sessionId);
   if (!st) return err("La mesa no está abierta");
   const bill = await computeBill(tdb, sessionId);
@@ -340,7 +347,7 @@ export async function confirmPayment(sessionId: string): Promise<ActionState> {
 /** La casa invita (o deja de invitar) un plato. */
 export async function compItem(itemId: string, comped: boolean, reason?: string): Promise<ActionState> {
   const { tdb, tenant, membership } = await auth();
-  if (!CASHIER_ROLES.includes(membership.role)) return err("Solo caja o admin pueden invitar");
+  if (!hasRole(membership, CASHIER_ROLES)) return err("Solo caja o admin pueden invitar");
   const item = await tdb.orderItem.findFirst({
     where: { id: itemId, order: { session: { status: { not: "CLOSED" } } } },
     include: { order: true },
@@ -360,7 +367,7 @@ export async function setDiscount(
   input: { kind: "percent" | "amount"; value: number; reason?: string },
 ): Promise<ActionState> {
   const { tdb, tenant, membership } = await auth();
-  if (!CASHIER_ROLES.includes(membership.role)) return err("Solo caja o admin pueden hacer descuentos");
+  if (!hasRole(membership, CASHIER_ROLES)) return err("Solo caja o admin pueden hacer descuentos");
   const bill = await computeBill(tdb, sessionId);
   if (bill.status === "CLOSED") return err("La mesa ya se cobró");
   if (bill.paidCents > 0) return err("Ya hay pagos registrados");
@@ -383,7 +390,7 @@ export async function setDiscount(
 /** Para el diálogo de cobro: la cuenta actual de la mesa. */
 export async function getBill(sessionId: string) {
   const { tdb, membership } = await auth();
-  if (!CASHIER_ROLES.includes(membership.role)) return null;
+  if (!hasRole(membership, CASHIER_ROLES)) return null;
   return computeBill(tdb, sessionId);
 }
 
@@ -505,7 +512,7 @@ export async function acceptOrder(orderId: string): Promise<ActionState> {
   const order = await orderWithSession(tdb, orderId);
   if (!order) return err("Pedido no encontrado");
   if (order.status !== "PENDING") return err("Ese pedido ya fue procesado");
-  if (membership.role === "MOZO" && order.session.waiterId && order.session.waiterId !== membership.id) {
+  if (!hasRole(membership, CASHIER_ROLES) && order.session.waiterId && order.session.waiterId !== membership.id) {
     return err("Es una mesa de otro mozo");
   }
 
@@ -513,7 +520,7 @@ export async function acceptOrder(orderId: string): Promise<ActionState> {
     where: { id: orderId },
     data: { status: "ACCEPTED", acceptedById: membership.id, acceptedAt: new Date() },
   });
-  if (!order.session.waiterId && membership.role === "MOZO") {
+  if (!order.session.waiterId && isWaiter(membership)) {
     await tdb.tableSession.update({ where: { id: order.sessionId }, data: { waiterId: membership.id } });
   }
   // Lo que no se prepara (agua, una lata…) queda listo para que el mozo lo lleve directo.
@@ -638,7 +645,7 @@ export async function createStaffOrder(sessionId: string, lines: StaffOrderLine[
       },
     });
     // Si la mesa no tenía mozo y lo carga un mozo, queda a su cargo.
-    if (!session.waiterId && membership.role === "MOZO") {
+    if (!session.waiterId && isWaiter(membership)) {
       await tx.tableSession.update({ where: { id: sessionId }, data: { waiterId: membership.id } });
     }
     return created;

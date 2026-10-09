@@ -101,13 +101,18 @@ export function OrderSheet({ onClose }: { onClose: () => void }) {
                         return (
                           <li key={i.id} className="flex items-start gap-2">
                             <span className="w-6 shrink-0 font-semibold tabular-nums">{i.quantity}×</span>
-                            <span className={cn("min-w-0 flex-1", i.phase === "rejected" && "text-muted line-through")}>
+                            <span className={cn("min-w-0 flex-1", (i.phase === "rejected" || i.phase === "cancelled") && "text-muted line-through")}>
                               {i.name}
                               {i.modifiers.length > 0 && (
                                 <span className="block text-xs text-muted no-underline">{i.modifiers.map((m) => m.name).join(", ")}</span>
                               )}
                               {i.phase === "rejected" && i.rejectReason && (
                                 <span className="block text-xs text-danger">{i.rejectReason}</span>
+                              )}
+                              {i.phase === "cancelled" && (
+                                <span className="block text-xs text-danger">
+                                  {i.cancelReason ?? "No se pudo preparar"} · no se cobra
+                                </span>
                               )}
                             </span>
                             <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium", ph.className)}>{ph.label}</span>

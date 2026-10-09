@@ -10,7 +10,7 @@ import { ALLERGENS } from "@/lib/allergens";
 import { requireTenantRole } from "@/lib/auth/guards";
 import { ADMIN_ROLES } from "@/lib/auth/permissions";
 import { formatPrice } from "@/lib/format";
-import { CategoryHeader, NewCategoryForm } from "./category-forms";
+import { CategoryHeader } from "./category-forms";
 import { ProductRowActions } from "./product-row-actions";
 
 export const metadata: Metadata = { title: "Carta" };
@@ -39,11 +39,9 @@ export default async function AdminCartaPage({ searchParams }: PageProps<"/admin
             <ButtonLink href="/admin/carta/modificadores" variant="secondary">
               <SlidersHorizontal className="size-4" aria-hidden /> Opciones y extras
             </ButtonLink>
-            {categories.length > 0 && (
-              <ButtonLink href="/admin/carta/producto/nuevo">
-                <Plus className="size-4" aria-hidden /> Nuevo producto
-              </ButtonLink>
-            )}
+            <ButtonLink href="/admin/carta/producto/nuevo">
+              <Plus className="size-4" aria-hidden /> Nuevo producto
+            </ButtonLink>
           </div>
         }
       />
@@ -116,9 +114,17 @@ export default async function AdminCartaPage({ searchParams }: PageProps<"/admin
           </section>
         ))}
 
-        <Card className="p-4">
-          <NewCategoryForm />
-        </Card>
+        {categories.length === 0 && (
+          <Card className="p-6 text-center">
+            <p className="font-medium">La carta está vacía</p>
+            <p className="mt-1 text-sm text-muted">
+              Creá el primer producto. La categoría (Entrantes, Bebidas…) se elige o se crea ahí mismo.
+            </p>
+            <ButtonLink href="/admin/carta/producto/nuevo" className="mt-4">
+              <Plus className="size-4" aria-hidden /> Nuevo producto
+            </ButtonLink>
+          </Card>
+        )}
       </div>
     </>
   );

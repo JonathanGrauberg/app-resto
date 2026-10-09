@@ -5,7 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { Role } from "@/generated/prisma/enums";
 import { PageHeader } from "@/components/app-shell";
 import { requireTenantRole } from "@/lib/auth/guards";
-import { ADMIN_ROLES, canManageRole } from "@/lib/auth/permissions";
+import { ADMIN_ROLES, canManageRoles, rolesOf } from "@/lib/auth/permissions";
 import { StaffForm } from "../staff-form";
 
 export const metadata: Metadata = { title: "Personal" };
@@ -17,9 +17,9 @@ export default async function StaffPage({ params }: PageProps<"/admin/personal/[
 
   const m = isNew ? null : await tdb.membership.findUnique({ where: { id }, include: { user: true } });
   if (!isNew && !m) notFound();
-  if (m && !canManageRole(me.role, m.role)) forbidden();
+  if (m && !canManageRoles(me, rolesOf(m))) forbidden();
 
-  const roles = Object.values(Role).filter((r) => canManageRole(me.role, r));
+  const roles = Object.values(Role).filter((r) => canManageRoles(me, [r]));
 
   return (
     <>
@@ -35,13 +35,13 @@ export default async function StaffPage({ params }: PageProps<"/admin/personal/[
             ? {
                 id: m.id,
                 name: m.user.name,
-                role: m.role,
+                roles: rolesOf(m),
                 email: m.user.email ?? "",
                 hasPassword: !!m.user.passwordHash,
                 hasPin: !!m.pinHash,
                 active: m.active,
               }
-            : { name: "", role: "MOZO", email: "", hasPassword: false, hasPin: false, active: true }
+            : { name: "", roles: ["MOZO"], email: "", hasPassword: false, hasPin: false, active: true }
         }
       />
     </>

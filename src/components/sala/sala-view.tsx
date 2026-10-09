@@ -9,7 +9,7 @@ import type { PublicMenu } from "@/lib/public-menu";
 import type { SalaData, SalaTable } from "@/lib/sala";
 import { addExtraTable, joinTables } from "@/app/staff/sala-actions";
 import { TablePanel } from "./table-panel";
-import { elapsed, groupLabel, groupMembers, sessionFor, useNow, type Me } from "./sala-utils";
+import { elapsed, groupLabel, groupMembers, minutesSince, sessionFor, shortMinutes, useNow, waitColor, type Me } from "./sala-utils";
 
 export function SalaView({
   data,
@@ -138,8 +138,12 @@ export function SalaView({
             {stats.noWaiter} sin mozo
           </span>
         )}
-        <div className="ml-auto hidden md:block">
+        <div className="ml-auto hidden flex-wrap items-center gap-3 md:flex">
           <TableLegend />
+          <span className="inline-flex items-center gap-1.5 text-xs text-muted" title="Cada 30 min cambia de color">
+            <span className="h-3 w-10 rounded-full bg-[linear-gradient(90deg,#16a34a,#65a30d,#ca8a04,#ea580c,#dc2626)]" />
+            Desde el 1.er pedido
+          </span>
         </div>
       </div>
 
@@ -269,7 +273,8 @@ export function SalaView({
               const members = groupMembers(allTables, t);
               const session = sessionFor(data.sessions, members);
               const style = STATUS_STYLE[t.status];
-              const capacity = members.reduce((n, m) => n + m.maxGuests, 0);
+              const capacity = members.reduce((n, m) => n + m.seats, 0);
+              const waited = session?.firstOrderAt && now !== null ? minutesSince(session.firstOrderAt, now) : null;
               const isSel = selected && groupMembers(allTables, selected).some((m) => m.id === t.id);
               const inJoin = joinSel?.includes(t.id);
               const mine = session?.waiterId === me.membershipId;
@@ -324,9 +329,18 @@ export function SalaView({
                       {session.readyItems}
                     </span>
                   )}
+                  {waited !== null && (
+                    <span
+                      className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full px-1.5 text-[11px] font-bold leading-[18px] tabular-nums text-white ring-2 ring-surface"
+                      style={{ backgroundColor: waitColor(waited) }}
+                      title="Tiempo desde el primer pedido"
+                    >
+                      {shortMinutes(waited)}
+                    </span>
+                  )}
                   {session?.waiterCalledAt && (
                     <span
-                      className="absolute -bottom-2 left-1/2 flex size-6 -translate-x-1/2 animate-bounce items-center justify-center rounded-full bg-warn text-white ring-2 ring-surface"
+                      className="absolute -bottom-2 -right-2 flex size-6 animate-bounce items-center justify-center rounded-full bg-warn text-white ring-2 ring-surface"
                       title="Llama al mozo"
                     >
                       <BellRing className="size-3.5" aria-hidden />
@@ -343,14 +357,15 @@ export function SalaView({
                     {session ? (
                       <>
                         <span className="block">
-                          {session.guests} comensales (tope {capacity})
+                          {session.guests} comensales · {capacity} sillas
                         </span>
                         <span className="block">Mozo: {session.waiterName ?? "sin asignar"}</span>
-                        {now !== null && <span className="block opacity-70">Hace {elapsed(session.openedAt, now)}</span>}
+                        {now !== null && <span className="block opacity-70">Abierta hace {elapsed(session.openedAt, now)}</span>}
+                        {waited !== null && <span className="block opacity-70">Primer pedido hace {elapsed(session.firstOrderAt!, now)}</span>}
                       </>
                     ) : (
                       <span className="block">
-                        {t.seats} sillas · tope {t.maxGuests}
+                        {t.seats} sillas
                       </span>
                     )}
                   </span>

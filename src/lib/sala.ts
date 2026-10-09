@@ -20,7 +20,7 @@ export async function getSalaData(tdb: TenantDb) {
       },
     }),
     tdb.membership.findMany({
-      where: { role: "MOZO", active: true },
+      where: { active: true, OR: [{ role: "MOZO" }, { extraRoles: { has: "MOZO" } }] },
       include: { user: { select: { name: true } } },
     }),
   ]);
@@ -53,6 +53,8 @@ export async function getSalaData(tdb: TenantDb) {
       guests: s.guests,
       status: s.status,
       openedAt: s.openedAt.toISOString(),
+      /** Primer pedido de la mesa (para el reloj de espera del plano). */
+      firstOrderAt: s.orders[0]?.createdAt.toISOString() ?? null,
       closeRequestedAt: s.closeRequestedAt?.toISOString() ?? null,
       waiterId: s.waiterId,
       waiterName: s.waiter?.user.name ?? null,
@@ -77,6 +79,7 @@ export async function getSalaData(tdb: TenantDb) {
           addedBy: i.addedBy,
           addedById: i.addedById,
           status: i.status,
+          cancelReason: i.cancelReason,
         })),
       })),
     })),

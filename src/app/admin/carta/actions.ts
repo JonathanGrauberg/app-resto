@@ -38,17 +38,22 @@ const categorySchema = z.object({
   description: optionalText,
 });
 
-export async function createCategory(_: ActionState, formData: FormData): Promise<ActionState> {
+/** Se crea desde el formulario del producto ("+ Nueva categoría") y queda elegida. */
+export async function createCategory(name: string): Promise<{ id: string; name: string } | { error: string }> {
   const { tdb, tenant } = await auth();
-  const parsed = categorySchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return fail(parsed.error);
+  const parsed = categorySchema.safeParse({ name, description: "" });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Nombre no válido" };
+
+  // Si ya existe una con ese nombre, se reutiliza en vez de duplicarla.
+  const existing = await tdb.category.findFirst({ where: { name: { equals: parsed.data.name, mode: "insensitive" } } });
+  if (existing) return { id: existing.id, name: existing.name };
 
   const last = await tdb.category.findFirst({ orderBy: { sortOrder: "desc" } });
-  await tdb.category.create({
+  const created = await tdb.category.create({
     data: { ...parsed.data, tenantId: tenant.id, sortOrder: (last?.sortOrder ?? -1) + 1 },
   });
   refresh(tenant.slug);
-  return success(`Categoría "${parsed.data.name}" creada`);
+  return { id: created.id, name: created.name };
 }
 
 export async function renameCategory(id: string, _: ActionState, formData: FormData): Promise<ActionState> {

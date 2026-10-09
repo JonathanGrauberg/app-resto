@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Printer } from "lucide-react";
+import { LocalTime } from "@/components/local-time";
 import { formatPrice } from "@/lib/format";
 
 /** Caja: mesas cobradas en la jornada, con reimpresión de la cuenta (si se perdió el ticket). */
@@ -27,7 +28,7 @@ export function ClosedToday({
             <li key={r.id} className="flex items-center gap-3 px-4 py-3 text-sm">
               <span className="w-24 shrink-0 font-semibold">Mesa {r.label}</span>
               <span className="min-w-0 flex-1 truncate text-muted">
-                {new Date(r.closedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" })} ·{" "}
+                <LocalTime iso={r.closedAt} /> ·{" "}
                 {r.guests} pers.{r.waiterName ? ` · ${r.waiterName}` : ""}
               </span>
               <span className="shrink-0 font-semibold tabular-nums">{formatPrice(r.totalCents)}</span>

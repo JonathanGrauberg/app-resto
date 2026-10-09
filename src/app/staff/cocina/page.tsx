@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { KdsBoard } from "@/components/kds/kds-board";
 import { requireTenantRole } from "@/lib/auth/guards";
+import { hasRole } from "@/lib/auth/permissions";
 import { getKdsData } from "@/lib/kds";
 import { getPrepMode, screenStations } from "@/lib/prep";
 
@@ -11,7 +12,7 @@ export const metadata: Metadata = { title: "Cocina" };
 export default async function CocinaPage() {
   const { tdb, tenant, membership } = await requireTenantRole(["OWNER", "ADMIN", "COCINA", "BAR"], "KDS");
   const mode = await getPrepMode(tenant.id);
-  if (membership.role === "BAR" && mode === "SEPARATE") redirect("/staff/bar");
+  if (mode === "SEPARATE" && !hasRole(membership, ["OWNER", "ADMIN", "COCINA"])) redirect("/staff/bar");
   const orders = await getKdsData(tdb, screenStations(mode, "KITCHEN"));
   return <KdsBoard orders={orders} station="KITCHEN" single={mode === "SINGLE"} />;
 }

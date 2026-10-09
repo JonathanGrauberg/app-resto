@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, useTransition, type PointerEvent } from "react";
+import { useEffect, useRef, useState, useTransition, type PointerEvent } from "react";
 import { Circle, ExternalLink, Plus, Printer, QrCode, RectangleHorizontal, RefreshCw, Settings2, Square, Trash2 } from "lucide-react";
 import { QrDialog } from "@/components/qr-dialog";
 import type { TableShape, TableStatus } from "@/generated/prisma/enums";
@@ -54,6 +54,19 @@ export function FloorEditor({ areas, slug, venue }: { areas: EditorArea[]; slug:
   const [message, setMessage] = useState<string | null>(null);
   const [, start] = useTransition();
   const canvasRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Tocar fuera del plano y del panel (cabecera, menú, espacio vacío) vuelve a las opciones del salón.
+  useEffect(() => {
+    const onDown = (e: globalThis.PointerEvent) => {
+      const el = e.target as Element | null;
+      if (!el || el.closest("[data-floor-table], [data-floor-keep], [role=dialog]")) return;
+      if (panelRef.current?.contains(el)) return;
+      setSelectedId(null);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, []);
 
   const area = areas.find((a) => a.id === areaId) ?? areas[0];
   if (!area) return <NewAreaCard first />;
@@ -81,25 +94,46 @@ export function FloorEditor({ areas, slug, venue }: { areas: EditorArea[]; slug:
     });
   })();
 
+  /**
+   * Arrastre con listeners en `window` (no en el botón): funciona igual con mouse, dedo y lápiz,
+   * aunque el dedo se salga de la mesa. Mientras se arrastra, la página no se desplaza.
+   */
   const onPointerDown = (e: PointerEvent<HTMLButtonElement>, t: EditorTable) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    e.preventDefault();
     setSelectedId(t.id);
     setMessage(null);
-    setDrag({ id: t.id, pointerX: e.clientX, pointerY: e.clientY, origX: t.posX, origY: t.posY, x: t.posX, y: t.posY });
+    let current: Drag = { id: t.id, pointerX: e.clientX, pointerY: e.clientY, origX: t.posX, origY: t.posY, x: t.posX, y: t.posY };
+    setDrag(current);
+
+    const move = (ev: globalThis.PointerEvent) => {
+      if (ev.pointerId !== e.pointerId || !canvasRef.current) return;
+      const cell = canvasRef.current.getBoundingClientRect().width / area.width;
+      const x = Math.min(Math.max(0, current.origX + Math.round((ev.clientX - current.pointerX) / cell)), area.width - t.width);
+      const y = Math.min(Math.max(0, current.origY + Math.round((ev.clientY - current.pointerY) / cell)), area.height - t.height);
+      if (x !== current.x || y !== current.y) {
+        current = { ...current, x, y };
+        setDrag(current);
+      }
+    };
+    const noScroll = (ev: TouchEvent) => ev.preventDefault();
+    const stop = (ev: globalThis.PointerEvent) => {
+      if (ev.pointerId !== e.pointerId) return;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      window.removeEventListener("pointercancel", stop);
+      window.removeEventListener("touchmove", noScroll);
+      if (ev.type === "pointercancel") setDrag(null);
+      else drop(current);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+    window.addEventListener("pointercancel", stop);
+    window.addEventListener("touchmove", noScroll, { passive: false });
   };
 
-  const onPointerMove = (e: PointerEvent<HTMLButtonElement>) => {
-    if (!drag || !canvasRef.current) return;
-    const cell = canvasRef.current.getBoundingClientRect().width / area.width;
-    const t = area.tables.find((x) => x.id === drag.id)!;
-    const x = Math.min(Math.max(0, drag.origX + Math.round((e.clientX - drag.pointerX) / cell)), area.width - t.width);
-    const y = Math.min(Math.max(0, drag.origY + Math.round((e.clientY - drag.pointerY) / cell)), area.height - t.height);
-    if (x !== drag.x || y !== drag.y) setDrag({ ...drag, x, y });
-  };
-
-  const onPointerUp = () => {
-    if (!drag) return;
-    const { id, x, y, origX, origY } = drag;
+  const drop = (d: Drag) => {
+    const { id, x, y, origX, origY } = d;
     setDrag(null);
     if (x === origX && y === origY) return;
     const t = area.tables.find((tt) => tt.id === id)!;
@@ -162,7 +196,7 @@ export function FloorEditor({ areas, slug, venue }: { areas: EditorArea[]; slug:
           >
             <Printer className="size-4" aria-hidden /> Imprimir QR
           </Link>
-          <Button onClick={addTable}>
+          <Button onClick={addTable} data-floor-keep>
             <Plus className="size-4" aria-hidden /> Añadir mesa
           </Button>
         </div>
@@ -206,13 +240,12 @@ export function FloorEditor({ areas, slug, venue }: { areas: EditorArea[]; slug:
                   <button
                     key={t.id}
                     type="button"
+                    data-floor-table
                     onPointerDown={(e) => onPointerDown(e, t)}
-                    onPointerMove={onPointerMove}
-                    onPointerUp={onPointerUp}
-                    onPointerCancel={() => setDrag(null)}
+                    onContextMenu={(e) => e.preventDefault()}
                     aria-label={`Mesa ${t.number}, ${t.seats} sillas. Arrastrá para mover.`}
                     className={cn(
-                      "absolute flex touch-none flex-col items-center justify-center border-2 text-center leading-tight shadow-sm",
+                      "absolute flex touch-none select-none flex-col items-center justify-center border-2 text-center leading-tight shadow-sm [-webkit-touch-callout:none]",
                       drag?.id === t.id ? "z-10 cursor-grabbing shadow-lg" : "cursor-grab transition-[left,top] duration-150",
                       t.shape === "ROUND" ? "rounded-full" : "rounded-xl",
                       style.className,
@@ -248,7 +281,7 @@ export function FloorEditor({ areas, slug, venue }: { areas: EditorArea[]; slug:
           )}
         </div>
 
-        <div className="space-y-4 lg:sticky lg:top-8">
+        <div ref={panelRef} className="space-y-4 lg:sticky lg:top-8">
           {selected ? (
             <TablePanel key={selected.id} table={selected} slug={slug} venue={venue} onDeleted={() => setSelectedId(null)} />
           ) : (
@@ -292,18 +325,14 @@ function TablePanel({
           </span>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
-          <Field label="Número" htmlFor="t-number" error={fe.number}>
-            <Input id="t-number" name="number" defaultValue={t.number} maxLength={6} required />
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Número" htmlFor="t-number" hint="Ej. 12, T9, B2" error={fe.number}>
+            <Input id="t-number" name="number" defaultValue={t.number} maxLength={6} required autoCapitalize="characters" />
           </Field>
           <Field label="Sillas" htmlFor="t-seats" error={fe.seats}>
-            <Input id="t-seats" name="seats" type="number" min={1} max={30} defaultValue={t.seats} required />
-          </Field>
-          <Field label="Tope" htmlFor="t-max" error={fe.maxGuests}>
-            <Input id="t-max" name="maxGuests" type="number" min={1} max={40} defaultValue={t.maxGuests} required />
+            <Input id="t-seats" name="seats" type="number" inputMode="numeric" min={1} max={30} defaultValue={t.seats} required />
           </Field>
         </div>
-        <p className="-mt-2 text-xs text-muted">Tope: máximo de personas permitido (por ejemplo, agregando sillas).</p>
 
         <fieldset>
           <legend className="mb-1.5 text-sm font-medium">Forma</legend>
@@ -322,10 +351,10 @@ function TablePanel({
         </fieldset>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Ancho" htmlFor="t-w" hint="En celdas">
+          <Field label="Ancho" htmlFor="t-w" hint="En celdas" error={fe.width}>
             <Input id="t-w" name="width" type="number" min={1} max={8} defaultValue={t.width} />
           </Field>
-          <Field label="Largo" htmlFor="t-h" hint="En celdas">
+          <Field label="Largo" htmlFor="t-h" hint="En celdas" error={fe.height}>
             <Input id="t-h" name="height" type="number" min={1} max={8} defaultValue={t.height} />
           </Field>
         </div>

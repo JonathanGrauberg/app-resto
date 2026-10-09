@@ -1,7 +1,7 @@
 import { AppShell, type NavItem } from "@/components/app-shell";
 import { StaffLive } from "@/components/staff-live";
 import { requireTenantRole } from "@/lib/auth/guards";
-import { ADMIN_ROLES } from "@/lib/auth/permissions";
+import { ADMIN_ROLES, rolesOf } from "@/lib/auth/permissions";
 import { getEnabledModules } from "@/lib/modules";
 import { staffChannel } from "@/lib/realtime/server";
 
@@ -26,7 +26,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
       <StaffLive
         channel={staffChannel(tenant.id)}
         membershipId={membership.id}
-        role={membership.role}
+        roles={rolesOf(membership)}
         salaHref="/admin/mesas?vista=sala"
       />
     </AppShell>

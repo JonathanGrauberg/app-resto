@@ -77,6 +77,7 @@ export async function dinerTableState(ctx: TableContext) {
         name: i.name,
         quantity: i.quantity,
         status: i.status,
+        cancelReason: i.cancelReason,
         modifiers: (i.modifiers as { name: string }[]) ?? [],
         notes: i.notes,
         addedBy: i.addedBy,

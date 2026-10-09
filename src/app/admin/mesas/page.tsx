@@ -7,7 +7,7 @@ import { SalaView } from "@/components/sala/sala-view";
 import { TableLegend } from "@/components/table-map";
 import { requireTenantRole } from "@/lib/auth/guards";
 import { getPublicMenu } from "@/lib/public-menu";
-import { ADMIN_ROLES } from "@/lib/auth/permissions";
+import { ADMIN_ROLES, rolesOf } from "@/lib/auth/permissions";
 import { cn } from "@/lib/format";
 import { getClosedToday, getSalaData } from "@/lib/sala";
 import { FloorEditor } from "./floor-editor";
@@ -55,7 +55,7 @@ export default async function AdminMesasPage({ searchParams }: PageProps<"/admin
         {tabs}
         <SalaView
           data={data}
-          me={{ membershipId: membership.id, role: membership.role }}
+          me={{ membershipId: membership.id, roles: rolesOf(membership) }}
           slug={tenant.slug}
           venue={tenant.name}
           menu={menu}

@@ -48,7 +48,8 @@ export const priceInput = z
   .refine((v) => /^\d{1,5}(\.\d{1,2})?$/.test(v), "Precio no válido (ej. 9,50)")
   .transform((v) => Math.round(Number(v) * 100));
 
-/** Checkbox de formulario → boolean. */
+/** Checkbox de formulario → boolean. Desmarcado no viaja en el formulario: el campo es opcional. */
 export const checkbox = z
-  .union([z.literal("on"), z.literal("true"), z.literal(""), z.undefined()])
+  .union([z.literal("on"), z.literal("true"), z.literal("")])
+  .optional()
   .transform((v) => v === "on" || v === "true");

@@ -131,15 +131,18 @@ model User {
 
 /// Pertenencia de un usuario a un tenant con un rol. El PIN es por tenant.
 model Membership {
-  id        String   @id @default(cuid())
-  tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role      Role
-  pinHash   String?
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Rol principal: define la pantalla de inicio.
+  role       Role
+  /// Roles adicionales (ej. Caja que también atiende mesas como Mozo).
+  extraRoles Role[]   @default([])
+  pinHash    String?
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
 
   tableSessions  TableSession[]
   ordersCreated  Order[]        @relation("OrderCreatedBy")
@@ -494,6 +497,8 @@ model OrderItem {
   readyAt        DateTime?
   /// Invitación de la casa: el plato no se cobra.
   comped         Boolean     @default(false)
+  /// Cocina/barra no lo pudo hacer (falta un ingrediente…): el plato queda CANCELLED con este motivo.
+  cancelReason   String?
   compReason     String?
   deliveredAt    DateTime?
 

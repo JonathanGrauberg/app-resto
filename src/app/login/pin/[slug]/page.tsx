@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { rolesLabel } from "@/lib/auth/permissions";
 import { db } from "@/lib/db";
 import { PinPad } from "./pin-pad";
 
@@ -19,7 +20,7 @@ export default async function PinLoginPage({ params }: PageProps<"/login/pin/[sl
   });
   if (!tenant || !tenant.active) notFound();
 
-  const people = tenant.memberships.map((m) => ({ id: m.id, name: m.user.name, role: m.role }));
+  const people = tenant.memberships.map((m) => ({ id: m.id, name: m.user.name, roleLabel: rolesLabel(m) }));
 
   return (
     <main className="flex flex-1 items-start justify-center px-4 py-8 sm:items-center">

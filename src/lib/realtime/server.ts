@@ -21,7 +21,20 @@ export type StaffEvent =
   // Pedido aceptado: suena en las pantallas de las estaciones que tienen platos para preparar.
   | { type: "kitchen.new"; tableLabel: string; stations: ("KITCHEN" | "BAR")[] }
   // Cocina/bar terminó: el mozo de la mesa tiene que llevarlo.
-  | { type: "item.ready"; tableLabel: string; sessionId: string; waiterId: string | null; station: string; summary: string };
+  | { type: "item.ready"; tableLabel: string; sessionId: string; waiterId: string | null; station: string; summary: string }
+  // Cocina/barra no puede hacer un plato: aviso al mozo de la mesa.
+  | { type: "item.cancelled"; tableLabel: string; sessionId: string; waiterId: string | null; summary: string; reason: string }
+  // Cocina/barra llama al mozo (de una mesa o a cualquiera).
+  | {
+      type: "kitchen.call";
+      tableLabel: string | null;
+      sessionId: string | null;
+      waiterId: string | null;
+      message: string;
+      from: "KITCHEN" | "BAR";
+    }
+  // La mesa pasó a pendiente de cobro: aviso a caja.
+  | { type: "table.pending"; tableLabel: string; sessionId: string; waiterName: string; byId: string };
 
 export type TableEvent =
   | { type: "cart" } // alguien de la mesa cambió el carrito

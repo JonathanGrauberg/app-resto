@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { Plus } from "lucide-react";
 import Link from "next/link";
 import type { Allergen, PrepStation } from "@/generated/prisma/enums";
 import { ImageUpload } from "@/components/image-upload";
@@ -9,7 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Field, FormError, Input, Select, Switch, Textarea } from "@/components/ui/field";
 import { ALLERGENS, ALLERGEN_KEYS } from "@/lib/allergens";
 import { cn, formatPrice } from "@/lib/format";
-import { saveProduct } from "./actions";
+import { createCategory, saveProduct } from "./actions";
 import { OwnExtrasEditor, type Extra } from "./own-extras-editor";
 import { useFormAction } from "@/lib/use-form-action";
 
@@ -77,15 +78,7 @@ export function ProductForm({
                 required
               />
             </Field>
-            <Field label="Categoría" htmlFor="categoryId" error={fe.categoryId}>
-              <Select id="categoryId" name="categoryId" defaultValue={values.categoryId} required>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+            <CategoryPicker initial={categories} defaultValue={values.categoryId} error={fe.categoryId} />
           </div>
           <Field label="Etiquetas" htmlFor="tags" hint="Separadas por coma: vegano, picante, casera… También sirven para el buscador." error={fe.tags}>
             <Input id="tags" name="tags" defaultValue={values.tags} />
@@ -220,5 +213,100 @@ export function ProductForm({
         </Card>
       </div>
     </form>
+  );
+}
+
+const NEW = "__nueva__";
+
+/** Categoría del producto: elegir una existente o crear una nueva sin salir del formulario. */
+function CategoryPicker({
+  initial,
+  defaultValue,
+  error,
+}: {
+  initial: { id: string; name: string }[];
+  defaultValue: string;
+  error?: string;
+}) {
+  const [categories, setCategories] = useState(initial);
+  const [value, setValue] = useState(defaultValue);
+  // Sin categorías todavía: el campo para crear la primera aparece abierto.
+  const [creating, setCreating] = useState(initial.length === 0);
+  const [name, setName] = useState("");
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+
+  const create = () =>
+    start(async () => {
+      const res = await createCategory(name);
+      if ("error" in res) return setCreateError(res.error);
+      setCategories((cur) => (cur.some((c) => c.id === res.id) ? cur : [...cur, res]));
+      setValue(res.id);
+      setName("");
+      setCreateError(null);
+      setCreating(false);
+    });
+
+  return (
+    <Field label="Categoría" htmlFor={creating ? "newCategory" : "categoryId"} error={createError ?? error}>
+      {/* El valor elegido viaja siempre en este campo (el desplegable puede estar oculto). */}
+      <input type="hidden" name="categoryId" value={value} />
+      {creating ? (
+        <div className="flex gap-2">
+          <Input
+            id="newCategory"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter crea la categoría (no envía el producto).
+              if (e.key === "Enter") {
+                e.preventDefault();
+                if (name.trim()) create();
+              }
+            }}
+            placeholder="Ej. Entrantes, Bebidas"
+            maxLength={40}
+            autoFocus
+          />
+          <Button type="button" onClick={create} disabled={pending || !name.trim()}>
+            {pending ? "…" : "Crear"}
+          </Button>
+          {categories.length > 0 && (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setCreating(false);
+                setCreateError(null);
+              }}
+            >
+              Cancelar
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <Select
+            id="categoryId"
+            value={value}
+            onChange={(e) => {
+              if (e.target.value === NEW) setCreating(true);
+              else setValue(e.target.value);
+            }}
+            required
+          >
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+            <option value={NEW}>＋ Nueva categoría…</option>
+          </Select>
+          <Button type="button" variant="secondary" onClick={() => setCreating(true)} aria-label="Nueva categoría" title="Nueva categoría">
+            <Plus className="size-4" aria-hidden />
+          </Button>
+        </div>
+      )}
+    </Field>
   );
 }

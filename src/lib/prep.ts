@@ -1,5 +1,6 @@
 import "server-only";
-import type { PrepMode, PrepStation, Role } from "@/generated/prisma/enums";
+import type { PrepMode, PrepStation } from "@/generated/prisma/enums";
+import { hasRole, rolesOf, type WithRoles } from "@/lib/auth/permissions";
 import { db } from "@/lib/db";
 
 /**
@@ -27,9 +28,10 @@ export function routeStations(mode: PrepMode, stations: PrepStation[]): ("KITCHE
   return real;
 }
 
-/** Qué estaciones puede marcar cada rol (null = todas). En modo único, cocina y barra comparten pantalla. */
-export function editableStations(mode: PrepMode, role: Role): PrepStation[] | null {
-  if (role === "COCINA") return mode === "SINGLE" ? ["KITCHEN", "BAR"] : ["KITCHEN"];
-  if (role === "BAR") return mode === "SINGLE" ? ["KITCHEN", "BAR"] : ["BAR"];
-  return null;
+/** Qué estaciones puede marcar una persona (null = todas). En modo único, cocina y barra comparten pantalla. */
+export function editableStations(mode: PrepMode, m: WithRoles): PrepStation[] | null {
+  if (hasRole(m, ["OWNER", "ADMIN"])) return null;
+  if (mode === "SINGLE") return ["KITCHEN", "BAR"];
+  const roles = rolesOf(m);
+  return [...(roles.includes("COCINA") ? (["KITCHEN"] as const) : []), ...(roles.includes("BAR") ? (["BAR"] as const) : [])];
 }

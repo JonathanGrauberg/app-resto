@@ -36,7 +36,6 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
     getPrepMode(tenant.id),
   ]);
   if (!isNew && !product) notFound();
-  if (categories.length === 0) notFound();
 
   const values: ProductValues = product
     ? {
@@ -59,7 +58,7 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
         name: "",
         description: "",
         price: "",
-        categoryId: typeof categoria === "string" && categories.some((c) => c.id === categoria) ? categoria : categories[0].id,
+        categoryId: typeof categoria === "string" && categories.some((c) => c.id === categoria) ? categoria : (categories[0]?.id ?? ""),
         station: "KITCHEN",
         allergens: [],
         modifierGroupIds: [],

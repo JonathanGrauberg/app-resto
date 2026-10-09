@@ -82,9 +82,8 @@ export function TablePanel({
     ...new Set(session?.orders.flatMap((o) => o.items.map((i) => i.addedBy)).filter((n): n is string => !!n) ?? []),
   ];
   const seats = members.reduce((n, m) => n + m.seats, 0);
-  const capacity = members.reduce((n, m) => n + m.maxGuests, 0);
   const [guests, setGuestsLocal] = useState(session?.guests ?? seats);
-  const isCashier = CASHIER.includes(me.role);
+  const isCashier = me.roles.some((r) => CASHIER.includes(r));
   const joined = members.length > 1;
   const title = joined ? `Mesas ${groupLabel(members)}` : `Mesa ${table.number}`;
   const style = STATUS_STYLE[session ? (session.status === "PENDING_PAYMENT" ? "PENDING_PAYMENT" : "OCCUPIED") : table.status];
@@ -113,7 +112,7 @@ export function TablePanel({
           <span className={cn("rounded-full border px-2 py-0.5 text-xs", style.className)}>{style.label}</span>
         </div>
         <p className="mt-0.5 text-sm text-muted">
-          {areaName} · {seats} sillas · tope {capacity}
+          {areaName} · {seats} sillas
           {session && now !== null && (
             <span className="ml-2 inline-flex items-center gap-1">
               <Clock className="size-3.5" aria-hidden /> {elapsed(session.openedAt, now)}
@@ -154,10 +153,10 @@ export function TablePanel({
                     <Plus className="size-5" aria-hidden />
                   </button>
                 </div>
-                {guests > capacity && (
+                {guests > seats && (
                   <p className="flex items-start gap-1.5 text-xs text-warn">
                     <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-                    Supera el tope ({capacity}). Sumá una silla o juntá otra mesa.
+                    Son más que las sillas ({seats}). Sumá una silla o juntá otra mesa.
                   </p>
                 )}
               </div>

@@ -35,6 +35,13 @@ function findFreeSpot(area: { width: number; height: number }, tables: Rect[], w
   return null;
 }
 
+/** Inicial del salón para numerar sus mesas ("Terraza" → "T"). La X queda para las mesas extra. */
+function areaPrefix(name: string) {
+  const letters = name.normalize("NFD").replace(/[^A-Za-z]/g, "").toUpperCase();
+  if (!letters) return "S";
+  return letters[0] === "X" ? letters.slice(0, 2) : letters[0];
+}
+
 async function hasOpenSession(tdb: TenantDb, tableIds: string[]) {
   return (await tdb.tableSession.count({ where: { tableId: { in: tableIds }, status: { not: "CLOSED" } } })) > 0;
 }
@@ -94,16 +101,19 @@ export async function createTable(areaId: string): Promise<ActionState & { id?: 
   const spot = findFreeSpot(area, area.tables, 2, 2);
   if (!spot) return { error: "No queda lugar libre en el plano. Agrandalo desde la configuración del salón." };
 
-  // Siguiente número libre (numérico) en todo el local.
+  // Numeración por salón: el primero usa 1, 2, 3…; los demás llevan su inicial (Terraza → T1, T2…).
+  const first = await tdb.area.findFirst({ orderBy: { sortOrder: "asc" }, select: { id: true } });
+  const prefix = first?.id === areaId ? "" : areaPrefix(area.name);
   const numbers = new Set((await tdb.table.findMany({ select: { number: true } })).map((t) => t.number));
   let n = 1;
-  while (numbers.has(String(n))) n++;
+  while (numbers.has(`${prefix}${n}`)) n++;
+  const number = `${prefix}${n}`;
 
   const table = await tdb.table.create({
-    data: { tenantId: tenant.id, areaId, number: String(n), seats: 4, maxGuests: 4, ...spot, qrToken: newQrToken() },
+    data: { tenantId: tenant.id, areaId, number, seats: 4, maxGuests: 4, ...spot, qrToken: newQrToken() },
   });
   refresh();
-  return { ...success(`Mesa ${n} creada`), id: table.id };
+  return { ...success(`Mesa ${number} creada`), id: table.id };
 }
 
 const tableSchema = z
@@ -113,15 +123,14 @@ const tableSchema = z
       .trim()
       .min(1, "Requerido")
       .max(6, "Máximo 6 caracteres")
-      .regex(/^[\p{L}\d-]+$/u, "Solo letras, números y guiones"),
-    seats: z.coerce.number().int().min(1, "Mínimo 1").max(30),
-    maxGuests: z.coerce.number().int().min(1, "Mínimo 1").max(40),
+      .transform((v) => v.replace(/\s+/g, "").toUpperCase())
+      .pipe(z.string().regex(/^[\p{L}\d-]+$/u, "Solo letras, números y guiones")),
+    seats: z.coerce.number().int().min(1, "Mínimo 1").max(30, "Máximo 30"),
     shape: z.enum(TableShape),
-    width: z.coerce.number().int().min(1).max(8),
-    height: z.coerce.number().int().min(1).max(8),
+    width: z.coerce.number().int().min(1, "Mínimo 1").max(8, "Máximo 8"),
+    height: z.coerce.number().int().min(1, "Mínimo 1").max(8, "Máximo 8"),
     disabled: checkbox,
-  })
-  .refine((t) => t.maxGuests >= t.seats, { message: "No puede ser menor que las sillas", path: ["maxGuests"] });
+  });
 
 export async function updateTable(id: string, _: ActionState, formData: FormData): Promise<ActionState> {
   const { tdb } = await auth();
@@ -146,7 +155,8 @@ export async function updateTable(id: string, _: ActionState, formData: FormData
   }
   const status = disabled ? "DISABLED" : table.status === "DISABLED" ? "FREE" : table.status;
 
-  await tdb.table.update({ where: { id }, data: { ...data, status } });
+  // Sin "tope" aparte: el máximo de personas es la cantidad de sillas.
+  await tdb.table.update({ where: { id }, data: { ...data, maxGuests: data.seats, status } });
   refresh();
   return success("Mesa guardada");
 }

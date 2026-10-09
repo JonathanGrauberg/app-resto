@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { defineConfig, env } from "prisma/config";
+import { defineConfig } from "prisma/config";
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
@@ -9,6 +9,7 @@ export default defineConfig({
   },
   datasource: {
     // La CLI (migraciones) usa la conexión directa: el pooler de Neon no admite migraciones.
-    url: process.env.DIRECT_URL ?? env("DATABASE_URL"),
+    // `prisma generate` no se conecta: sin URL (p. ej. un build sin variables) no debe fallar.
+    url: process.env.DIRECT_URL ?? process.env.DATABASE_URL ?? "",
   },
 });

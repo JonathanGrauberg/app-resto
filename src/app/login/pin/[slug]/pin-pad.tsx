@@ -2,14 +2,12 @@
 
 import { useActionState, useState, type ComponentProps } from "react";
 import { Delete } from "lucide-react";
-import type { Role } from "@/generated/prisma/enums";
 import { Card } from "@/components/ui/card";
 import { FormError } from "@/components/ui/field";
-import { ROLE_LABEL } from "@/lib/auth/permissions";
 import { cn } from "@/lib/format";
 import { loginWithPin } from "../../actions";
 
-type Person = { id: string; name: string; role: Role };
+type Person = { id: string; name: string; roleLabel: string };
 
 export function PinPad({ slug, people }: { slug: string; people: Person[] }) {
   const [state, action, pending] = useActionState(loginWithPin, undefined);
@@ -31,7 +29,7 @@ export function PinPad({ slug, people }: { slug: string; people: Person[] }) {
               {p.name.charAt(0)}
             </span>
             <span className="block font-medium leading-tight">{p.name}</span>
-            <span className="text-xs text-muted">{ROLE_LABEL[p.role]}</span>
+            <span className="text-xs text-muted">{p.roleLabel}</span>
           </button>
         ))}
       </div>
@@ -50,7 +48,7 @@ export function PinPad({ slug, people }: { slug: string; people: Person[] }) {
         <div className="flex items-center justify-between">
           <div>
             <p className="font-medium">{person.name}</p>
-            <p className="text-xs text-muted">{ROLE_LABEL[person.role]}</p>
+            <p className="text-xs text-muted">{person.roleLabel}</p>
           </div>
           <button
             type="button"

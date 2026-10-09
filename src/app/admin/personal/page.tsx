@@ -6,20 +6,30 @@ import { ButtonLink } from "@/components/ui/button";
 import { Badge, Card } from "@/components/ui/card";
 import { FormSuccess } from "@/components/ui/field";
 import { requireTenantRole } from "@/lib/auth/guards";
-import { ADMIN_ROLES, ROLE_LABEL, canManageRole } from "@/lib/auth/permissions";
+import { ADMIN_ROLES, ROLE_LABEL, ROLE_ORDER, canManageRoles, hasRole, rolesOf, sortRoles } from "@/lib/auth/permissions";
 import { cn } from "@/lib/format";
+import { tableLabelOf } from "@/lib/table-session";
 
 export const metadata: Metadata = { title: "Personal" };
-
-const ROLE_ORDER = ["OWNER", "ADMIN", "CAJA", "MOZO", "COCINA", "BAR"] as const;
 
 export default async function AdminPersonalPage({ searchParams }: PageProps<"/admin/personal">) {
   const { tdb, tenant, membership: me } = await requireTenantRole(ADMIN_ROLES);
   const { ok } = await searchParams;
 
-  const members = await tdb.membership.findMany({
-    include: { user: { select: { name: true, email: true, passwordHash: true } } },
-  });
+  const [members, open] = await Promise.all([
+    tdb.membership.findMany({ include: { user: { select: { name: true, email: true, passwordHash: true } } } }),
+    // Mesas abiertas con mozo: para mostrar quién está libre.
+    tdb.tableSession.findMany({
+      where: { status: { not: "CLOSED" }, waiterId: { not: null } },
+      include: { table: { select: { number: true, groupId: true } } },
+    }),
+  ]);
+  const tablesOf = new Map<string, string[]>();
+  for (const s of open) {
+    tablesOf.set(s.waiterId!, [...(tablesOf.get(s.waiterId!) ?? []), await tableLabelOf(tdb, s.table)]);
+  }
+  const waiters = members.filter((m) => m.active && hasRole(m, ["MOZO"]));
+  const free = waiters.filter((m) => !tablesOf.has(m.id));
   members.sort(
     (a, b) =>
       Number(b.active) - Number(a.active) ||
@@ -43,9 +53,21 @@ export default async function AdminPersonalPage({ searchParams }: PageProps<"/ad
           <FormSuccess message={ok} />
         </div>
       )}
+      {waiters.length > 0 && (
+        <p className="mb-3 text-sm">
+          <span className={cn("font-semibold", free.length ? "text-ok" : "text-warn")}>{free.length === 1 ? "1 mozo libre" : `${free.length} mozos libres`}</span>
+          <span className="text-muted">
+            {" "}
+            de {waiters.length}
+            {free.length > 0 && ` · ${free.map((m) => m.user.name).join(", ")}`}
+          </span>
+        </p>
+      )}
       <Card className="divide-y divide-line">
         {members.map((m) => {
-          const editable = canManageRole(me.role, m.role);
+          const editable = canManageRoles(me, rolesOf(m));
+          const tables = tablesOf.get(m.id);
+          const isWaiter = m.active && hasRole(m, ["MOZO"]);
           const row = (
             <>
               <span
@@ -61,10 +83,22 @@ export default async function AdminPersonalPage({ searchParams }: PageProps<"/ad
                   {m.user.name}
                   {m.id === me.id && <span className="ml-1.5 text-xs font-normal text-muted">(vos)</span>}
                 </p>
-                <p className="truncate text-sm text-muted">{m.user.email ?? "Solo PIN"}</p>
+                <p className="truncate text-sm text-muted">
+                  {isWaiter && (
+                    <span className={cn("font-medium", tables ? "text-brand" : "text-ok")}>
+                      {tables ? `Atiende ${tables.length === 1 ? "la mesa" : "las mesas"} ${tables.join(", ")}` : "Libre"}
+                      {" · "}
+                    </span>
+                  )}
+                  {m.user.email ?? "Solo PIN"}
+                </p>
               </div>
               <div className="flex flex-wrap justify-end gap-1">
-                <Badge tone="brand">{ROLE_LABEL[m.role]}</Badge>
+                {sortRoles(rolesOf(m)).map((r) => (
+                  <Badge key={r} tone="brand">
+                    {ROLE_LABEL[r]}
+                  </Badge>
+                ))}
                 {m.pinHash && <Badge>PIN</Badge>}
                 {!m.active && <Badge tone="danger">Inactivo</Badge>}
               </div>

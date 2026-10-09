@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   Armchair,
   BarChart3,
@@ -38,9 +38,16 @@ export type NavIcon = keyof typeof ICONS;
 
 export function NavLinks({ items, variant }: { items: NavItem[]; variant: "side" | "bottom" }) {
   const pathname = usePathname();
+  const params = useSearchParams();
+  // Coincide la ruta y, si el ítem tiene query (ej. "/admin/mesas?vista=sala"), también la query.
+  const matches = (href: string) => {
+    const [path, query] = href.split("?");
+    if (pathname !== path && !pathname.startsWith(path + "/")) return false;
+    return [...new URLSearchParams(query)].every(([k, v]) => params.get(k) === v);
+  };
   // El ítem activo es el de href más largo que coincide (evita que "/admin" quede siempre activo).
   const active = items
-    .filter((i) => pathname === i.href || pathname.startsWith(i.href + "/"))
+    .filter((i) => matches(i.href))
     .sort((a, b) => b.href.length - a.href.length)[0]?.href;
 
   if (variant === "side") {

@@ -1,6 +1,7 @@
 import "server-only";
 import { forbidden, redirect } from "next/navigation";
 import type { ModuleKey, Role } from "@/generated/prisma/enums";
+import { hasRole } from "@/lib/auth/permissions";
 import { getSession } from "@/lib/auth/session";
 import { hasModule } from "@/lib/modules";
 import { tenantDb } from "@/lib/tenant-db";
@@ -27,7 +28,7 @@ export async function requireTenantRole(roles: Role[], module?: ModuleKey) {
   const session = await requireUser();
   const { membership, tenant } = session;
   if (!membership || !tenant) redirect("/login");
-  if (!roles.includes(membership.role)) forbidden();
+  if (!hasRole(membership, roles)) forbidden();
   if (module && !(await hasModule(tenant.id, module))) forbidden();
 
   return { ...session, membership, tenant, tdb: tenantDb(tenant.id) };

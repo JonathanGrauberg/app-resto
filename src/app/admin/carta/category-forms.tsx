@@ -1,39 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, Eye, EyeOff, Pencil, Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { ArrowDown, ArrowUp, Eye, EyeOff, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ActionButton } from "@/components/ui/action-button";
 import { FormError, Input } from "@/components/ui/field";
 import { cn } from "@/lib/format";
 import {
-  createCategory,
   deleteCategory,
   moveCategory,
   renameCategory,
   toggleCategoryVisible,
 } from "./actions";
 import { useFormAction } from "@/lib/use-form-action";
-
-export function NewCategoryForm() {
-  const [state, action, pending] = useFormAction(createCategory, undefined);
-  const ref = useRef<HTMLFormElement>(null);
-  useEffect(() => {
-    if (state?.at) ref.current?.reset();
-  }, [state?.at]);
-
-  return (
-    <form ref={ref} onSubmit={action} className="flex flex-wrap items-start gap-2">
-      <div className="min-w-48 flex-1">
-        <Input name="name" placeholder="Nueva categoría (ej. Ensaladas)" aria-label="Nombre de la nueva categoría" required />
-        {state?.fieldErrors?.name && <p className="mt-1 text-xs text-danger">{state.fieldErrors.name}</p>}
-      </div>
-      <Button type="submit" variant="secondary" disabled={pending}>
-        <Plus className="size-4" aria-hidden /> Añadir categoría
-      </Button>
-    </form>
-  );
-}
 
 export function CategoryHeader({
   id,

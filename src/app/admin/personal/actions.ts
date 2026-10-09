@@ -7,7 +7,7 @@ import { Role } from "@/generated/prisma/enums";
 import { checkbox, fail, success, type ActionState } from "@/lib/actions";
 import { requireTenantRole } from "@/lib/auth/guards";
 import { hashSecret, verifySecret } from "@/lib/auth/password";
-import { canManageRole, STAFF_MANAGER_ROLES } from "@/lib/auth/permissions";
+import { canManageRoles, hasRole, rolesOf, sortRoles, STAFF_MANAGER_ROLES } from "@/lib/auth/permissions";
 import { db } from "@/lib/db";
 import type { TenantDb } from "@/lib/tenant-db";
 
@@ -22,7 +22,7 @@ const pinField = z
 
 const staffSchema = z.object({
   name: z.string().trim().min(2, "Nombre demasiado corto").max(40),
-  role: z.enum(Role),
+  roles: z.array(z.enum(Role)).min(1, "Elegí al menos un rol"),
   email: z
     .string()
     .trim()
@@ -49,21 +49,25 @@ async function pinInUse(tdb: TenantDb, pin: string, exceptId?: string) {
 
 export async function saveStaff(id: string | null, _: ActionState, formData: FormData): Promise<ActionState> {
   const { tdb, tenant, membership: me } = await requireTenantRole(STAFF_MANAGER_ROLES);
-  const parsed = staffSchema.safeParse(Object.fromEntries(formData));
+  const parsed = staffSchema.safeParse({ ...Object.fromEntries(formData), roles: formData.getAll("roles") });
   if (!parsed.success) return fail(parsed.error);
   const d = parsed.data;
+  // El rol más importante es el principal (pantalla de inicio); el resto, adicionales.
+  const [role, ...extraRoles] = sortRoles(d.roles);
+  const next = { role, extraRoles };
 
-  if (!canManageRole(me.role, d.role)) return { error: "Tu rol no puede asignar ese rol" };
+  if (!canManageRoles(me, d.roles)) return { error: "Tu rol no puede asignar alguno de esos roles" };
 
   const current = id ? await tdb.membership.findUnique({ where: { id }, include: { user: true } }) : null;
   if (id && !current) return { error: "Usuario no encontrado" };
-  if (current && !canManageRole(me.role, current.role)) return { error: "Tu rol no puede editar a esta persona" };
+  if (current && !canManageRoles(me, rolesOf(current))) return { error: "Tu rol no puede editar a esta persona" };
 
   // Reglas de seguridad sobre uno mismo y el último dueño.
-  if (current?.id === me.id && (d.role !== current.role || !d.active)) {
-    return { error: "No podés cambiar tu propio rol ni desactivarte" };
+  const sameRoles = current && sortRoles(rolesOf(current)).join() === sortRoles(d.roles).join();
+  if (current?.id === me.id && (!sameRoles || !d.active)) {
+    return { error: "No podés cambiar tus propios roles ni desactivarte" };
   }
-  if (current?.role === "OWNER" && (d.role !== "OWNER" || !d.active)) {
+  if (current?.role === "OWNER" && (role !== "OWNER" || !d.active)) {
     const owners = await tdb.membership.count({ where: { role: "OWNER", active: true } });
     if (owners <= 1) return { error: "El local necesita al menos un dueño activo" };
   }
@@ -72,10 +76,10 @@ export async function saveStaff(id: string | null, _: ActionState, formData: For
   const hasPassword = !!d.password || !!current?.user.passwordHash;
   const hasPin = !!d.pin || !!current?.pinHash;
 
-  if (PASSWORD_ROLES.includes(d.role) && (!email || !hasPassword)) {
+  if (hasRole(next, PASSWORD_ROLES) && (!email || !hasPassword)) {
     return { error: "Este rol entra al panel: necesita email y contraseña", fieldErrors: { email: "Requerido para este rol" } };
   }
-  if (!PASSWORD_ROLES.includes(d.role) && !hasPin && !(email && hasPassword)) {
+  if (!hasRole(next, PASSWORD_ROLES) && !hasPin && !(email && hasPassword)) {
     return { error: "Asigná un PIN para que pueda entrar", fieldErrors: { pin: "Requerido" } };
   }
   if (d.pin && (await pinInUse(tdb, d.pin, current?.id))) {
@@ -97,7 +101,7 @@ export async function saveStaff(id: string | null, _: ActionState, formData: For
       }),
       db.membership.update({
         where: { id: current.id, tenantId: tenant.id },
-        data: { role: d.role, active: d.active, ...(pinHash ? { pinHash } : {}) },
+        data: { role, extraRoles, active: d.active, ...(pinHash ? { pinHash } : {}) },
       }),
     ]);
     // Al desactivar, se cierran sus sesiones abiertas.
@@ -108,7 +112,7 @@ export async function saveStaff(id: string | null, _: ActionState, formData: For
         name: d.name,
         email,
         passwordHash: passwordHash ?? null,
-        memberships: { create: { tenantId: tenant.id, role: d.role, pinHash: pinHash ?? null, active: d.active } },
+        memberships: { create: { tenantId: tenant.id, role, extraRoles, pinHash: pinHash ?? null, active: d.active } },
       },
     });
   }

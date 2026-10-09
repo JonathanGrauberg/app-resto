@@ -19,5 +19,5 @@ export const PHASE_LABEL: Record<ItemPhase, { label: string; className: string }
   ready: { label: "¡Listo!", className: "bg-ok text-white" },
   delivered: { label: "Entregado", className: "bg-ok-soft text-ok" },
   rejected: { label: "No se pudo tomar", className: "bg-danger-soft text-danger" },
-  cancelled: { label: "Cancelado", className: "bg-ink/5 text-muted" },
+  cancelled: { label: "No sale", className: "bg-danger-soft text-danger" },
 };

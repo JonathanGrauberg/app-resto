@@ -3,6 +3,7 @@ import { ClosedToday } from "@/components/sala/closed-today";
 import { SalaView } from "@/components/sala/sala-view";
 import { ShiftBar } from "@/components/sala/shift-bar";
 import { requireTenantRole } from "@/lib/auth/guards";
+import { rolesOf } from "@/lib/auth/permissions";
 import { getPublicMenu } from "@/lib/public-menu";
 import { getClosedToday, getSalaData } from "@/lib/sala";
 import { currentShift, shiftSummary } from "@/lib/shift";
@@ -25,7 +26,7 @@ export default async function CajaPage() {
       <ShiftBar shift={summary} />
       <SalaView
         data={data}
-        me={{ membershipId: membership.id, role: membership.role }}
+        me={{ membershipId: membership.id, roles: rolesOf(membership) }}
         slug={tenant.slug}
         venue={tenant.name}
         menu={menu}

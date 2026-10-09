@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { Role } from "@/generated/prisma/enums";
 import type { SalaSession, SalaTable } from "@/lib/sala";
 
-export type Me = { membershipId: string; role: Role };
+export type Me = { membershipId: string; roles: Role[] };
 
 /** Agrupa mesas juntadas: devuelve, por mesa, las mesas de su grupo (ordenadas por número). */
 export function groupMembers(tables: SalaTable[], t: SalaTable) {
@@ -42,3 +42,19 @@ export function elapsed(fromIso: string, now: number | null) {
   return `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, "0")}`;
 }
 
+
+/** Colores del reloj de mesa: verde y, cada 30 min, un paso más hacia el rojo (desde 2 h, rojo). */
+const WAIT_COLORS = ["#16a34a", "#65a30d", "#ca8a04", "#ea580c", "#dc2626"];
+
+export function minutesSince(fromIso: string, now: number) {
+  return Math.max(0, Math.floor((now - new Date(fromIso).getTime()) / 60_000));
+}
+
+export function waitColor(min: number) {
+  return WAIT_COLORS[Math.min(WAIT_COLORS.length - 1, Math.floor(min / 30))];
+}
+
+/** Formato corto para el plano: "45′", "1h05". */
+export function shortMinutes(min: number) {
+  return min < 60 ? `${min}′` : `${Math.floor(min / 60)}h${String(min % 60).padStart(2, "0")}`;
+}
