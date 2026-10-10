@@ -34,6 +34,8 @@ export type BookingConfig = {
   maxDays: number;
   maxParty: number;
   notice: string | null;
+  /** Con lista de espera, la web no ofrece horarios dentro de estos minutos. */
+  waitlistHoldMin: number;
 };
 
 /** Horario sugerido la primera vez que se configura (martes a domingo, mediodía y noche). */
@@ -53,6 +55,7 @@ export async function getBookingConfig(tenantId: string): Promise<BookingConfig>
     maxDays: s?.bookingMaxDays ?? 30,
     maxParty: s?.bookingMaxParty ?? 8,
     notice: s?.bookingNotice ?? null,
+    waitlistHoldMin: s?.waitlistHoldMin ?? 90,
   };
 }
 
@@ -151,10 +154,10 @@ export function tableOptions(tables: TableLite[], busy: Busy[], range: { startsA
   return [...singles.map((t) => [t]), ...pairs];
 }
 
-/** Mesas que se pueden reservar (fijas, habilitadas). */
-export function bookableTables(tdb: TenantDb) {
+/** Mesas que se pueden reservar (fijas, habilitadas). Online: sin las marcadas "solo sin reserva". */
+export function bookableTables(tdb: TenantDb, online = false) {
   return tdb.table.findMany({
-    where: { archivedAt: null, temporary: false, status: { not: "DISABLED" } },
+    where: { archivedAt: null, temporary: false, status: { not: "DISABLED" }, ...(online ? { onlineBookable: true } : {}) },
     select: { id: true, number: true, seats: true, areaId: true },
     orderBy: { number: "asc" },
   });
@@ -166,6 +169,35 @@ function busyBetween(tenantId: string, from: Date, to: Date) {
     where: { active: true, startsAt: { lt: to }, endsAt: { gt: from }, reservation: { tenantId } },
     select: { tableId: true, startsAt: true, endsAt: true },
   });
+}
+
+/**
+ * Mesas ocupadas ahora: cuentan como tomadas hasta que se calcula que se liberan
+ * (apertura + duración de una reserva; si ya pasó, media hora más desde ahora).
+ * Una mesa por cobrar se libera en breve (15 min).
+ */
+async function occupiedBusy(tdb: TenantDb, cfg: BookingConfig, now: Date): Promise<Busy[]> {
+  const sessions = await tdb.tableSession.findMany({
+    where: { status: { not: "CLOSED" } },
+    select: { status: true, openedAt: true, tableId: true, table: { select: { groupId: true } } },
+  });
+  if (!sessions.length) return [];
+  const groupIds = sessions.map((s) => s.table.groupId).filter((g): g is string => !!g);
+  const members = groupIds.length ? await tdb.table.findMany({ where: { groupId: { in: groupIds } }, select: { id: true, groupId: true } }) : [];
+  return sessions.flatMap((s) => {
+    const end =
+      s.status === "PENDING_PAYMENT"
+        ? now.getTime() + 15 * 60_000
+        : Math.max(s.openedAt.getTime() + cfg.durationMin * 60_000, now.getTime() + 30 * 60_000);
+    const ids = s.table.groupId ? members.filter((m) => m.groupId === s.table.groupId).map((m) => m.id) : [s.tableId];
+    return ids.map((tableId) => ({ tableId, startsAt: s.openedAt, endsAt: new Date(end) }));
+  });
+}
+
+/** Ocupado = reservas activas + mesas con gente sentada ahora. */
+async function allBusy(tdb: TenantDb, tenantId: string, cfg: BookingConfig, from: Date, to: Date, now: Date) {
+  const [reserved, occupied] = await Promise.all([busyBetween(tenantId, from, to), occupiedBusy(tdb, cfg, now)]);
+  return [...reserved, ...occupied];
 }
 
 /**
@@ -186,14 +218,16 @@ export async function availability(tdb: TenantDb, tenantId: string, cfg: Booking
   await expireReservations(tdb, cfg.graceMin);
   const slots = slotsOfDay(cfg, date);
   if (!slots.length) return [];
-  const minStart = new Date(now.getTime() + cfg.leadMin * 60_000);
+  // Con gente esperando en la puerta, la web no ofrece horarios cercanos: tienen prioridad.
+  const waiting = cfg.waitlistHoldMin > 0 ? await tdb.waitlistEntry.count({ where: { status: "WAITING" } }) : 0;
+  const minStart = new Date(now.getTime() + Math.max(cfg.leadMin, waiting ? cfg.waitlistHoldMin : 0) * 60_000);
   const ranges = slots.map((time) => {
     const startsAt = zonedToUtc(date, time, cfg.timezone);
     return { time, startsAt, endsAt: new Date(startsAt.getTime() + cfg.durationMin * 60_000) };
   });
   const [tables, busy] = await Promise.all([
-    bookableTables(tdb),
-    busyBetween(tenantId, ranges[0].startsAt, ranges[ranges.length - 1].endsAt),
+    bookableTables(tdb, true),
+    allBusy(tdb, tenantId, cfg, ranges[0].startsAt, ranges[ranges.length - 1].endsAt, now),
   ]);
   return ranges.map((r) => ({
     time: r.time,
@@ -229,7 +263,7 @@ export async function createBooking(tdb: TenantDb, tenantId: string, cfg: Bookin
   const startsAt = zonedToUtc(b.date, b.time, cfg.timezone);
   const endsAt = new Date(startsAt.getTime() + cfg.durationMin * 60_000);
   const range = { startsAt, endsAt };
-  const tables = await bookableTables(tdb);
+  const tables = await bookableTables(tdb, b.source === "PUBLIC");
 
   let options: TableLite[][];
   if (b.tableIds?.length) {
@@ -238,7 +272,7 @@ export async function createBooking(tdb: TenantDb, tenantId: string, cfg: Bookin
     options = [picked];
   } else {
     await expireReservations(tdb, cfg.graceMin);
-    options = tableOptions(tables, await busyBetween(tenantId, startsAt, endsAt), range, b.party);
+    options = tableOptions(tables, await allBusy(tdb, tenantId, cfg, startsAt, endsAt, new Date()), range, b.party);
   }
   if (!options.length) return { error: "Ya no queda lugar a esa hora. Probá con otro horario." } as const;
 

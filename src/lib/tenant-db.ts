@@ -17,6 +17,7 @@ const TENANT_MODELS = new Set([
   "Order",
   "OrderItem",
   "Reservation",
+  "WaitlistEntry",
   "Event",
   "Notification",
   "Payment",

@@ -24,6 +24,7 @@ type Values = {
   bookingLeadMin: number;
   bookingMaxDays: number;
   bookingMaxParty: number;
+  waitlistHoldMin: number;
   bookingNotice: string;
 };
 
@@ -82,6 +83,15 @@ export function BookingSettingsForm({ values, firstTime }: { values: Values; fir
           <Field label="Máximo de personas online" htmlFor="party" hint="Grupos más grandes: por teléfono" error={fe.bookingMaxParty}>
             <Input id="party" name="bookingMaxParty" type="number" min={1} max={50} defaultValue={values.bookingMaxParty} />
           </Field>
+          <Field
+            label="Prioridad de la lista de espera (min)"
+            htmlFor="hold"
+            hint="Con gente esperando en la puerta, la web no ofrece horarios dentro de este tiempo. 0 = no frenar."
+            error={fe.waitlistHoldMin}
+            className="sm:col-span-2"
+          >
+            <Input id="hold" name="waitlistHoldMin" type="number" min={0} max={360} step={15} defaultValue={values.waitlistHoldMin} className="sm:max-w-[calc(50%-0.5rem)]" />
+          </Field>
           <Field label="Aviso para el cliente (opcional)" htmlFor="notice" hint="Se muestra al reservar" error={fe.bookingNotice} className="sm:col-span-2">
             <Textarea id="notice" name="bookingNotice" rows={2} maxLength={300} defaultValue={values.bookingNotice} placeholder="Ej. Si venís con mascota, avisanos en comentarios." />
           </Field>
@@ -90,8 +100,9 @@ export function BookingSettingsForm({ values, firstTime }: { values: Values; fir
 
       <Card className="space-y-4 p-4 lg:sticky lg:top-8">
         <p className="text-sm text-muted">
-          La mesa se asigna sola: la más chica en la que entran (o dos juntas del mismo salón). Las mesas extra y las
-          deshabilitadas no se reservan.
+          La mesa se asigna sola: la más chica en la que entran (o dos juntas del mismo salón). Las mesas ocupadas cuentan
+          hasta que se calcula que se liberan. Las mesas extra, las deshabilitadas y las marcadas &ldquo;Sin reserva
+          online&rdquo; (en el plano) no se ofrecen por la web.
         </p>
         <FormError message={state?.error} />
         <FormSuccess message={state?.ok} />

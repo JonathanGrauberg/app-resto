@@ -96,6 +96,7 @@ export default async function AdminMesasPage({ searchParams }: PageProps<"/admin
             qrToken: t.qrToken,
             temporary: t.temporary,
             groupId: t.groupId,
+            onlineBookable: t.onlineBookable,
           })),
         }))}
       />

@@ -45,6 +45,7 @@ model Tenant {
   orders         Order[]
   orderItems     OrderItem[]
   reservations   Reservation[]
+  waitlist       WaitlistEntry[]
   events         Event[]
   notifications  Notification[]
   translations   Translation[]
@@ -110,6 +111,8 @@ model TenantSettings {
   bookingMaxParty    Int     @default(8)
   /// Texto para el cliente al reservar (política, cómo llegar…).
   bookingNotice      String?
+  /// Con gente en la lista de espera, la web no ofrece horarios dentro de estos minutos (0 = no se frena).
+  waitlistHoldMin    Int     @default(90)
 }
 
 model TenantModule {
@@ -217,29 +220,31 @@ enum TableStatus {
 }
 
 model Table {
-  id         String      @id @default(cuid())
-  tenantId   String
-  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  areaId     String
-  area       Area        @relation(fields: [areaId], references: [id], onDelete: Cascade)
-  number     String
-  seats      Int         @default(4)
-  maxGuests  Int         @default(4)
-  shape      TableShape  @default(SQUARE)
-  posX       Int         @default(0)
-  posY       Int         @default(0)
-  width      Int         @default(2)
-  height     Int         @default(2)
-  status     TableStatus @default(FREE)
+  id             String      @id @default(cuid())
+  tenantId       String
+  tenant         Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  areaId         String
+  area           Area        @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  number         String
+  seats          Int         @default(4)
+  maxGuests      Int         @default(4)
+  shape          TableShape  @default(SQUARE)
+  posX           Int         @default(0)
+  posY           Int         @default(0)
+  width          Int         @default(2)
+  height         Int         @default(2)
+  status         TableStatus @default(FREE)
   /// Token aleatorio del QR; regenerable. Nunca usar el id en la URL pública.
-  qrToken    String      @unique
-  groupId    String?
-  group      TableGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  qrToken        String      @unique
+  groupId        String?
+  group          TableGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
   /// Mesa extra agregada durante el servicio (traída del depósito, etc.).
   /// Se elimina sola cuando se cobra la mesa a la que estaba unida.
-  temporary  Boolean     @default(false)
+  temporary      Boolean     @default(false)
   /// Mesa retirada (ej. extra ya cobrada). No aparece en plano ni sala; se conserva para el historial.
-  archivedAt DateTime?
+  archivedAt     DateTime?
+  /// false = solo para quien llega sin reserva (barra, mesas altas): la web nunca la ofrece.
+  onlineBookable Boolean     @default(true)
 
   sessions     TableSession[]
   reservations ReservationTable[]
@@ -582,6 +587,31 @@ model ReservationTable {
 
   @@id([reservationId, tableId])
   @@index([tableId, startsAt])
+}
+
+enum WaitlistStatus {
+  WAITING
+  SEATED
+  LEFT // se fue sin sentarse
+}
+
+/// Lista de espera presencial: grupos que llegaron sin reserva y esperan mesa.
+model WaitlistEntry {
+  id         String         @id @default(cuid())
+  tenantId   String
+  tenant     Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name       String
+  partySize  Int
+  phone      String?
+  notes      String?
+  status     WaitlistStatus @default(WAITING)
+  /// Mesa donde se sentó ("3+4"), para el historial.
+  tableLabel String?
+  createdAt  DateTime       @default(now())
+  seatedAt   DateTime?
+  leftAt     DateTime?
+
+  @@index([tenantId, status, createdAt])
 }
 
 model Event {

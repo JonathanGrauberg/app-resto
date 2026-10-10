@@ -37,6 +37,7 @@ export type EditorTable = {
   qrToken: string;
   temporary: boolean;
   groupId: string | null;
+  onlineBookable: boolean;
 };
 export type EditorArea = { id: string; name: string; width: number; height: number; tables: EditorTable[] };
 
@@ -358,6 +359,13 @@ function TablePanel({
             <Input id="t-h" name="height" type="number" min={1} max={8} defaultValue={t.height} />
           </Field>
         </div>
+
+        <Switch
+          name="onlineBookable"
+          defaultChecked={t.onlineBookable}
+          label="Reservable online"
+          description="Apagalo para guardarla a quien llega sin reserva (barra, mesas altas)"
+        />
 
         <Switch name="disabled" defaultChecked={t.status === "DISABLED"} label="Deshabilitada" description="No acepta pedidos ni reservas (y su QR no funciona)" />
 

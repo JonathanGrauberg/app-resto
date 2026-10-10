@@ -130,6 +130,7 @@ const tableSchema = z
     width: z.coerce.number().int().min(1, "Mínimo 1").max(8, "Máximo 8"),
     height: z.coerce.number().int().min(1, "Mínimo 1").max(8, "Máximo 8"),
     disabled: checkbox,
+    onlineBookable: checkbox,
   });
 
 export async function updateTable(id: string, _: ActionState, formData: FormData): Promise<ActionState> {

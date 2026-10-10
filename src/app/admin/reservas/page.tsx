@@ -85,6 +85,7 @@ export default async function AdminReservasPage({ searchParams }: PageProps<"/ad
             bookingLeadMin: cfg.leadMin,
             bookingMaxDays: cfg.maxDays,
             bookingMaxParty: cfg.maxParty,
+            waitlistHoldMin: cfg.waitlistHoldMin,
             bookingNotice: cfg.notice ?? "",
           }}
         />

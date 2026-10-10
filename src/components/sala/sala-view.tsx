@@ -2,13 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
-import { BellRing, CalendarClock, Link2, Plus, Users, X } from "lucide-react";
+import { Armchair, BellRing, CalendarClock, Link2, ListOrdered, Plus, Users, X } from "lucide-react";
 import { STATUS_STYLE, TableLegend } from "@/components/table-map";
 import { cn } from "@/lib/format";
 import type { PublicMenu } from "@/lib/public-menu";
 import type { SalaData, SalaReservation, SalaTable } from "@/lib/sala";
 import { addExtraTable, joinTables } from "@/app/staff/sala-actions";
 import { TablePanel } from "./table-panel";
+import { WaitlistPanel, waitlistSuggestion } from "./waitlist";
+import { seatFromWaitlist } from "@/app/staff/waitlist-actions";
 import { elapsed, groupLabel, groupMembers, minutesSince, sessionFor, shortMinutes, useNow, waitColor, type Me } from "./sala-utils";
 
 export function SalaView({
@@ -34,10 +36,15 @@ export function SalaView({
   const [joining, startJoin] = useTransition();
   const [extraSeats, setExtraSeats] = useState<number | null>(null); // formulario "mesa extra" suelta
   const [extraMsg, setExtraMsg] = useState<string | null>(null);
+  const [showWaitlist, setShowWaitlist] = useState(false);
+  const [seatMsg, setSeatMsg] = useState<string | null>(null);
 
   // La actualización en vivo la hace <StaffLive> (en el layout), con respaldo periódico si se corta.
 
   const allTables = useMemo(() => data.areas.flatMap((a) => a.tables), [data.areas]);
+  const tablesWithArea = useMemo(() => data.areas.flatMap((a) => a.tables.map((t) => ({ ...t, areaName: a.name }))), [data.areas]);
+  // Mesa libre que le sirve al primero de la lista que entra (sin reserva encima).
+  const suggestion = waitlistSuggestion(data.waitlist, tablesWithArea, data.reservations, data.bookingDurationMin, now);
   const area = data.areas.find((a) => a.id === areaId) ?? data.areas[0];
   const selected = allTables.find((t) => t.id === selectedId) ?? null;
 
@@ -178,15 +185,63 @@ export function SalaView({
         })}
       </div>
         <button
+          onClick={() => setShowWaitlist((v) => !v)}
+          className={cn(
+            "ml-auto inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm ring-1",
+            data.waitlist.length ? "bg-warn-soft font-semibold text-warn ring-warn/40" : "ring-line hover:ring-ink/30",
+          )}
+        >
+          <ListOrdered className="size-4" aria-hidden /> Lista de espera
+          {data.waitlist.length > 0 && <span className="tabular-nums">· {data.waitlist.length}</span>}
+        </button>
+        <button
           onClick={() => {
             setExtraMsg(null);
             setExtraSeats(2);
           }}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm ring-1 ring-line hover:ring-ink/30"
+          className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm ring-1 ring-line hover:ring-ink/30"
         >
           <Plus className="size-4" aria-hidden /> Mesa extra
         </button>
       </div>
+
+      {suggestion && !joinSel && (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-ok/50 bg-ok-soft/60 p-3 text-sm">
+          <Armchair className="size-4 text-ok" aria-hidden />
+          <span className="flex-1">
+            <strong>Mesa {suggestion.table.number}</strong> libre ({suggestion.table.seats} sillas) →{" "}
+            <strong>{suggestion.entry.name}</strong> ({suggestion.entry.party}), en la lista de espera
+            {data.waitlist[0]?.id !== suggestion.entry.id && " (los primeros no entran en esa mesa)"}
+          </span>
+          {seatMsg && <span className="w-full text-danger">{seatMsg}</span>}
+          <button
+            onClick={() =>
+              startJoin(async () => {
+                const res = await seatFromWaitlist(suggestion.entry.id, suggestion.table.id);
+                setSeatMsg(res?.error ?? null);
+                router.refresh();
+              })
+            }
+            disabled={joining}
+            className="rounded-lg bg-ok px-4 py-2 font-semibold text-white disabled:opacity-50"
+          >
+            Sentar
+          </button>
+        </div>
+      )}
+
+      {showWaitlist && (
+        <WaitlistPanel
+          entries={data.waitlist}
+          tables={tablesWithArea}
+          reservations={data.reservations}
+          durationMin={data.bookingDurationMin}
+          timezone={data.timezone}
+          now={now}
+          onClose={() => setShowWaitlist(false)}
+          onDone={() => router.refresh()}
+        />
+      )}
 
       {extraSeats !== null && (
         <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-surface p-3 text-sm">
@@ -374,6 +429,7 @@ export function SalaView({
                       {members.length > 1 ? `Mesas ${groupLabel(members)}` : `Mesa ${t.number}`} · {style.label}
                     </span>
                     {t.temporary && <span className="block opacity-70">Mesa extra (temporal)</span>}
+                    {!t.onlineBookable && <span className="block opacity-70">Sin reserva online</span>}
                     {booking && (
                       <span className="block font-medium">
                         Reserva {bookingTime} · {booking.name} ({booking.party})

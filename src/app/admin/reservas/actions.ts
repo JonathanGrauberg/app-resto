@@ -47,6 +47,7 @@ const settingsSchema = z.object({
   bookingLeadMin: z.coerce.number().int().min(0).max(2880, "Máximo 48 h"),
   bookingMaxDays: z.coerce.number().int().min(1, "Mínimo 1").max(180, "Máximo 180"),
   bookingMaxParty: z.coerce.number().int().min(1, "Mínimo 1").max(50, "Máximo 50"),
+  waitlistHoldMin: z.coerce.number().int().min(0).max(360, "Máximo 6 h"),
   bookingNotice: z
     .string()
     .trim()

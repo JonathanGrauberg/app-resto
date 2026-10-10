@@ -8,7 +8,7 @@ export async function getSalaData(tdb: TenantDb, tenantId: string) {
   const cfg = await getBookingConfig(tenantId);
   await expireReservations(tdb, cfg.graceMin);
   const now = Date.now();
-  const [areas, sessions, waiters, reservations] = await Promise.all([
+  const [areas, sessions, waiters, reservations, waitlist] = await Promise.all([
     tdb.area.findMany({
       orderBy: { sortOrder: "asc" },
       include: { tables: { where: { archivedAt: null }, orderBy: { number: "asc" } } },
@@ -34,6 +34,7 @@ export async function getSalaData(tdb: TenantDb, tenantId: string) {
       orderBy: { startsAt: "asc" },
       include: { tables: { select: { tableId: true } } },
     }),
+    tdb.waitlistEntry.findMany({ where: { status: "WAITING" }, orderBy: { createdAt: "asc" } }),
   ]);
 
   return {
@@ -56,6 +57,7 @@ export async function getSalaData(tdb: TenantDb, tenantId: string) {
         groupId: t.groupId,
         temporary: t.temporary,
         qrToken: t.qrToken,
+        onlineBookable: t.onlineBookable,
       })),
     })),
     sessions: sessions.map((s) => ({
@@ -106,6 +108,16 @@ export async function getSalaData(tdb: TenantDb, tenantId: string) {
       tableIds: r.tables.map((t) => t.tableId),
     })),
     timezone: cfg.timezone,
+    /** Cuánto ocupa una reserva: para no sugerir una mesa que tiene una reserva enseguida. */
+    bookingDurationMin: cfg.durationMin,
+    waitlist: waitlist.map((w) => ({
+      id: w.id,
+      name: w.name,
+      party: w.partySize,
+      phone: w.phone,
+      notes: w.notes,
+      createdAt: w.createdAt.toISOString(),
+    })),
   };
 }
 
@@ -132,3 +144,4 @@ export type SalaData = Awaited<ReturnType<typeof getSalaData>>;
 export type SalaTable = SalaData["areas"][number]["tables"][number];
 export type SalaSession = SalaData["sessions"][number];
 export type SalaReservation = SalaData["reservations"][number];
+export type WaitlistItem = SalaData["waitlist"][number];
