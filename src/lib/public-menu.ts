@@ -13,8 +13,10 @@ export const getPublicTenant = cache(async (slug: string) => {
 type PublicTenant = NonNullable<Awaited<ReturnType<typeof getPublicTenant>>>;
 
 /** Datos de portada serializables para el cliente. */
-export function toVenue(t: PublicTenant) {
+/** `bookingUrl`: enlace a reservar (solo en la carta pública, si el local toma reservas online). */
+export function toVenue(t: PublicTenant, bookingUrl: string | null = null) {
   return {
+    bookingUrl,
     name: t.name,
     slug: t.slug,
     tagline: t.settings?.tagline ?? null,

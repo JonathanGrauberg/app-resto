@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { MenuExperience } from "@/components/menu/menu-experience";
 import { MenuThemeScript } from "@/components/menu/menu-theme-script";
+import { getBookingConfig } from "@/lib/booking";
+import { hasModule } from "@/lib/modules";
 import { getPublicMenu, getPublicTenant, toVenue } from "@/lib/public-menu";
 
 export async function generateMetadata({ params }: PageProps<"/[slug]">): Promise<Metadata> {
@@ -34,12 +36,14 @@ export default async function PublicMenuPage({ params }: PageProps<"/[slug]">) {
   const { slug } = await params;
   const tenant = await getPublicTenant(slug);
   if (!tenant) notFound();
-  const menu = await getPublicMenu(tenant.id);
+  const [menu, booking] = await Promise.all([getPublicMenu(tenant.id), hasModule(tenant.id, "RESERVAS")]);
+  // El botón "Reservar" aparece solo si el local tiene reservas y ya cargó horarios.
+  const bookingUrl = booking && Object.keys((await getBookingConfig(tenant.id)).hours).length ? `/${tenant.slug}/reservar` : null;
 
   return (
     <main className="flex-1">
       <MenuThemeScript slug={tenant.slug} theme={tenant.settings?.menuTheme ?? "DARK"} />
-      <MenuExperience venue={toVenue(tenant)} menu={menu} />
+      <MenuExperience venue={toVenue(tenant, bookingUrl)} menu={menu} />
     </main>
   );
 }

@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import {
   AlertTriangle,
+  Armchair,
+  CalendarClock,
   Clock,
   ExternalLink,
   Link2,
@@ -25,7 +27,8 @@ import { StaffOrderComposer } from "./staff-order";
 import type { PublicMenu } from "@/lib/public-menu";
 import { STATUS_STYLE } from "@/components/table-map";
 import { cn } from "@/lib/format";
-import type { SalaSession, SalaTable } from "@/lib/sala";
+import type { SalaReservation, SalaSession, SalaTable } from "@/lib/sala";
+import { seatReservation } from "@/app/admin/reservas/actions";
 import {
   addExtraTable,
   assignWaiter,
@@ -46,6 +49,8 @@ export function TablePanel({
   table,
   members,
   session,
+  reservation,
+  timezone,
   areaName,
   areaId,
   menu,
@@ -60,6 +65,9 @@ export function TablePanel({
   table: SalaTable;
   members: SalaTable[];
   session: SalaSession | null;
+  /** Próxima reserva de la mesa (esperando que lleguen). */
+  reservation: SalaReservation | null;
+  timezone: string;
   areaName: string;
   areaId: string;
   menu: PublicMenu;
@@ -120,6 +128,34 @@ export function TablePanel({
           )}
         </p>
       </div>
+
+      {reservation && (
+        <section
+          className={cn(
+            "rounded-xl border p-3 text-sm",
+            session ? "border-warn/50 bg-warn-soft/50" : "border-brand/40 bg-brand-soft/50",
+          )}
+        >
+          <p className="flex items-center gap-2 font-semibold">
+            <CalendarClock className="size-4" aria-hidden />
+            Reserva{" "}
+            {new Date(reservation.startsAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: timezone })} ·{" "}
+            {reservation.name} ({reservation.party})
+          </p>
+          {reservation.notes && <p className="mt-1 text-muted">“{reservation.notes}”</p>}
+          {session ? (
+            <p className="mt-1 text-warn">La mesa está ocupada: liberala antes de que lleguen o sentalos en otra.</p>
+          ) : (
+            <button
+              onClick={() => run(() => seatReservation(reservation.id))}
+              disabled={pending}
+              className="mt-2 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-ok text-sm font-semibold text-white disabled:opacity-50"
+            >
+              <Armchair className="size-4" aria-hidden /> Llegaron: abrir la mesa
+            </button>
+          )}
+        </section>
+      )}
 
       {table.status === "DISABLED" ? (
         <p className="rounded-xl bg-ink/5 p-3 text-sm text-muted">

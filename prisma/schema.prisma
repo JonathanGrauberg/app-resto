@@ -92,6 +92,24 @@ model TenantSettings {
   extraLocales    String[]  @default([])
   /// Horarios de apertura, JSON libre por día: { "mon": [["12:00","16:00"]], ... }
   openingHours    Json?
+
+  // Reservas
+  /// Franjas en que se puede reservar, por día: { "mon": [["13:00","15:30"],["20:00","23:00"]], ... } (hora de llegada).
+  bookingHours       Json?
+  /// Cuánto ocupa una reserva la mesa.
+  bookingDurationMin Int     @default(90)
+  /// Cada cuántos minutos se ofrece un horario (13:00, 13:30…).
+  bookingSlotMin     Int     @default(30)
+  /// Tolerancia de espera: pasado este tiempo sin llegar, la reserva se da por no presentada y libera la mesa.
+  bookingGraceMin    Int     @default(15)
+  /// Antelación mínima para reservar online.
+  bookingLeadMin     Int     @default(60)
+  /// Hasta cuántos días adelante se puede reservar.
+  bookingMaxDays     Int     @default(30)
+  /// Máximo de personas por reserva online (más que esto: por teléfono).
+  bookingMaxParty    Int     @default(8)
+  /// Texto para el cliente al reservar (política, cómo llegar…).
+  bookingNotice      String?
 }
 
 model TenantModule {
@@ -518,8 +536,20 @@ enum ReservationStatus {
   COMPLETED
 }
 
+enum ReservationSource {
+  PUBLIC // desde la web del local
+  STAFF // cargada por el local (teléfono, evento…)
+}
+
 model Reservation {
   id            String            @id @default(cuid())
+  /// Código del enlace público para ver o cancelar la reserva.
+  code          String            @unique
+  source        ReservationSource @default(PUBLIC)
+  /// Aceptación de la política de privacidad (RGPD) en reservas online.
+  consentAt     DateTime?
+  seatedAt      DateTime?
+  cancelledAt   DateTime?
   tenantId      String
   tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customerName  String

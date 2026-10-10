@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: "Caja" };
 export default async function CajaPage() {
   const { tdb, tenant, membership } = await requireTenantRole(["OWNER", "ADMIN", "CAJA"], "CAJA");
   const [data, closed, menu, shift] = await Promise.all([
-    getSalaData(tdb),
+    getSalaData(tdb, tenant.id),
     getClosedToday(tdb),
     getPublicMenu(tenant.id),
     currentShift(tdb),

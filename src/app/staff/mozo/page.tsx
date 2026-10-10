@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "Sala" };
 
 export default async function MozoPage() {
   const { tdb, tenant, membership } = await requireTenantRole(CAN_MANAGE_TABLES);
-  const [data, menu] = await Promise.all([getSalaData(tdb), getPublicMenu(tenant.id)]);
+  const [data, menu] = await Promise.all([getSalaData(tdb, tenant.id), getPublicMenu(tenant.id)]);
   return (
     <div className="mx-auto max-w-7xl">
       <h1 className="mb-3 text-xl font-semibold">Sala</h1>

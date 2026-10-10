@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useRef, useState } from "react";
-import { Ban, BellRing, ChefHat, HandPlatter, ReceiptText, Wallet, X } from "lucide-react";
+import { Ban, BellRing, CalendarDays, ChefHat, HandPlatter, ReceiptText, Wallet, X } from "lucide-react";
 import type { Role } from "@/generated/prisma/enums";
 import { useLive } from "@/lib/realtime/use-live";
 
-type Kind = "order" | "call" | "ready" | "pay" | "kitchen" | "cancel";
+type Kind = "order" | "call" | "ready" | "pay" | "kitchen" | "cancel" | "booking";
 type Toast = { id: number; kind: Kind; title: string; detail: string };
 
 const KIND_STYLE: Record<Kind, { icon: typeof BellRing; className: string }> = {
@@ -16,6 +16,7 @@ const KIND_STYLE: Record<Kind, { icon: typeof BellRing; className: string }> = {
   pay: { icon: Wallet, className: "bg-warn text-white" },
   kitchen: { icon: ChefHat, className: "bg-brand text-brand-ink" },
   cancel: { icon: Ban, className: "bg-danger text-white" },
+  booking: { icon: CalendarDays, className: "bg-brand text-brand-ink" },
 };
 
 const NOTES: Record<Kind, number[]> = {
@@ -25,6 +26,7 @@ const NOTES: Record<Kind, number[]> = {
   pay: [784, 988, 784, 988],
   kitchen: [523, 784, 523],
   cancel: [440, 330],
+  booking: [659, 880],
 };
 
 /** Dos tonos cortos con Web Audio (sin archivos). Los navegadores lo permiten tras el primer toque en la página. */
@@ -97,6 +99,19 @@ export function StaffLive({
         }
       }
       if (!has("OWNER", "ADMIN", "CAJA", "MOZO")) return;
+
+      // Reservas online: a caja / admin.
+      if (e.type === "booking.new" || e.type === "booking.cancelled") {
+        if (has("OWNER", "ADMIN", "CAJA")) {
+          const when = new Date(String(e.startsAt)).toLocaleString("es-ES", { weekday: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+          push(
+            e.type === "booking.new"
+              ? { kind: "booking", title: `Nueva reserva · ${e.name} (${e.party})`, detail: `${when} · Mesa ${e.tables}` }
+              : { kind: "booking", title: `Reserva cancelada · ${e.name}`, detail: when },
+          );
+        }
+        return;
+      }
 
       // Caja: una mesa pasó a "pendiente de cobro".
       if (e.type === "table.pending") {

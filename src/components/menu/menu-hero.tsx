@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowDown, Globe, MapPin } from "lucide-react";
+import { ArrowDown, CalendarDays, Globe, MapPin } from "lucide-react";
 import type { MenuTheme } from "@/generated/prisma/enums";
 import { FadeOverlay, Photo } from "@/components/mock-image";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -9,6 +9,7 @@ import { cn, formatPrice } from "@/lib/format";
 import type { PublicMenu, PublicProduct } from "@/lib/public-menu";
 
 export type Venue = {
+  bookingUrl: string | null;
   name: string;
   slug: string;
   tagline: string | null;
@@ -130,6 +131,14 @@ export function MenuHero({
           className="size-11 shrink-0 rounded-xl ring-1 ring-ink/10"
         />
         <div className="flex-1" />
+        {venue.bookingUrl && (
+          <a
+            href={venue.bookingUrl}
+            className="inline-flex h-11 items-center gap-2 rounded-full bg-brand px-4 text-sm font-semibold text-brand-ink shadow-lg hover:brightness-105"
+          >
+            <CalendarDays className="size-4" aria-hidden /> Reservar
+          </a>
+        )}
         <div className="flex items-center gap-1 rounded-full bg-bg/50 p-1 backdrop-blur-md">
           {ctas.map(({ href, label, icon: Icon }) => (
             <a

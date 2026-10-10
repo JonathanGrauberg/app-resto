@@ -2,11 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
-import { BellRing, Link2, Plus, Users, X } from "lucide-react";
+import { BellRing, CalendarClock, Link2, Plus, Users, X } from "lucide-react";
 import { STATUS_STYLE, TableLegend } from "@/components/table-map";
 import { cn } from "@/lib/format";
 import type { PublicMenu } from "@/lib/public-menu";
-import type { SalaData, SalaTable } from "@/lib/sala";
+import type { SalaData, SalaReservation, SalaTable } from "@/lib/sala";
 import { addExtraTable, joinTables } from "@/app/staff/sala-actions";
 import { TablePanel } from "./table-panel";
 import { elapsed, groupLabel, groupMembers, minutesSince, sessionFor, shortMinutes, useNow, waitColor, type Me } from "./sala-utils";
@@ -50,7 +50,8 @@ export function SalaView({
     const toAccept = data.sessions.reduce((n, s) => n + s.pendingOrders, 0);
     const calling = data.sessions.filter((s) => s.waiterCalledAt).length;
     const toDeliver = data.sessions.reduce((n, s) => n + s.readyItems, 0);
-    return { free, pending, open, guests, noWaiter, toAccept, calling, toDeliver };
+    const booked = data.reservations.length;
+    return { free, pending, open, guests, noWaiter, toAccept, calling, toDeliver, booked };
   }, [allTables, data.sessions]);
 
   if (!area) {
@@ -131,6 +132,11 @@ export function SalaView({
         {stats.calling > 0 && (
           <span className="inline-flex items-center gap-1 rounded-full bg-warn px-2.5 py-0.5 text-xs font-semibold text-white">
             <BellRing className="size-3" aria-hidden /> {stats.calling} {stats.calling === 1 ? "mesa llama" : "mesas llaman"}
+          </span>
+        )}
+        {stats.booked > 0 && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-brand-soft px-2.5 py-0.5 text-xs font-medium text-brand">
+            <CalendarClock className="size-3" aria-hidden /> {stats.booked} {stats.booked === 1 ? "reserva próxima" : "reservas próximas"}
           </span>
         )}
         {stats.noWaiter > 0 && (
@@ -275,6 +281,8 @@ export function SalaView({
               const style = STATUS_STYLE[t.status];
               const capacity = members.reduce((n, m) => n + m.seats, 0);
               const waited = session?.firstOrderAt && now !== null ? minutesSince(session.firstOrderAt, now) : null;
+              const booking = reservationFor(data.reservations, members);
+              const bookingTime = booking ? hhmm(booking.startsAt, data.timezone) : null;
               const isSel = selected && groupMembers(allTables, selected).some((m) => m.id === t.id);
               const inJoin = joinSel?.includes(t.id);
               const mine = session?.waiterId === me.membershipId;
@@ -347,6 +355,18 @@ export function SalaView({
                     </span>
                   )}
                   {mine && <span className="absolute -left-1 -top-1 size-3 rounded-full bg-ok ring-2 ring-surface" title="Tu mesa" />}
+                  {booking && (
+                    <span
+                      className={cn(
+                        "absolute -bottom-2 -left-2 flex items-center gap-0.5 rounded-full px-1.5 text-[10px] font-bold leading-[18px] tabular-nums ring-2 ring-surface",
+                        // Mesa ocupada con una reserva encima: se avisa en ámbar.
+                        session ? "bg-warn text-white" : "bg-brand text-brand-ink",
+                      )}
+                      title={`Reservada ${bookingTime} · ${booking.name} (${booking.party})`}
+                    >
+                      <CalendarClock className="size-3" aria-hidden /> {bookingTime}
+                    </span>
+                  )}
 
                   {/* Tooltip (solo dispositivos con mouse) */}
                   <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-max max-w-52 -translate-x-1/2 rounded-xl bg-ink px-3 py-2 text-left text-xs text-bg shadow-lg [@media(hover:hover)]:group-hover:block">
@@ -354,6 +374,11 @@ export function SalaView({
                       {members.length > 1 ? `Mesas ${groupLabel(members)}` : `Mesa ${t.number}`} · {style.label}
                     </span>
                     {t.temporary && <span className="block opacity-70">Mesa extra (temporal)</span>}
+                    {booking && (
+                      <span className="block font-medium">
+                        Reserva {bookingTime} · {booking.name} ({booking.party})
+                      </span>
+                    )}
                     {session ? (
                       <>
                         <span className="block">
@@ -396,6 +421,8 @@ export function SalaView({
                 table={selected}
                 members={groupMembers(allTables, selected)}
                 session={sessionFor(data.sessions, groupMembers(allTables, selected))}
+                reservation={reservationFor(data.reservations, groupMembers(allTables, selected))}
+                timezone={data.timezone}
                 areaName={data.areas.find((a) => a.tables.some((t) => t.id === selected.id))?.name ?? ""}
                 waiters={data.waiters}
                 me={me}
@@ -418,3 +445,10 @@ export function SalaView({
     </div>
   );
 }
+
+/** Próxima reserva de una mesa (o de alguna de las juntadas). */
+function reservationFor(list: SalaReservation[], members: SalaTable[]) {
+  return list.find((r) => r.tableIds.some((id) => members.some((m) => m.id === id))) ?? null;
+}
+
+const hhmm = (iso: string, tz: string) => new Date(iso).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: tz });

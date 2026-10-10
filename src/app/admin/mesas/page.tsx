@@ -48,7 +48,7 @@ export default async function AdminMesasPage({ searchParams }: PageProps<"/admin
   );
 
   if (live) {
-    const [data, closed, menu] = await Promise.all([getSalaData(tdb), getClosedToday(tdb), getPublicMenu(tenant.id)]);
+    const [data, closed, menu] = await Promise.all([getSalaData(tdb, tenant.id), getClosedToday(tdb), getPublicMenu(tenant.id)]);
     return (
       <>
         <PageHeader title="Salones y mesas" description="Operación en vivo: lo mismo que ven mozos y caja." />

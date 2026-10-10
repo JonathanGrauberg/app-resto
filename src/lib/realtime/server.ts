@@ -34,7 +34,10 @@ export type StaffEvent =
       from: "KITCHEN" | "BAR";
     }
   // La mesa pasó a pendiente de cobro: aviso a caja.
-  | { type: "table.pending"; tableLabel: string; sessionId: string; waiterName: string; byId: string };
+  | { type: "table.pending"; tableLabel: string; sessionId: string; waiterName: string; byId: string }
+  // Reservas online: aviso a caja / admin.
+  | { type: "booking.new"; name: string; party: number; startsAt: string; tables: string }
+  | { type: "booking.cancelled"; name: string; startsAt: string };
 
 export type TableEvent =
   | { type: "cart" } // alguien de la mesa cambió el carrito

@@ -1,9 +1,14 @@
 import "server-only";
+import { expireReservations, getBookingConfig } from "@/lib/booking";
 import type { TenantDb } from "@/lib/tenant-db";
 
 /** Estado completo de la sala para la vista en vivo (mozo / caja). Serializable. */
-export async function getSalaData(tdb: TenantDb) {
-  const [areas, sessions, waiters] = await Promise.all([
+export async function getSalaData(tdb: TenantDb, tenantId: string) {
+  // Reservas que ya pasaron la tolerancia sin llegar liberan su mesa antes de dibujar la sala.
+  const cfg = await getBookingConfig(tenantId);
+  await expireReservations(tdb, cfg.graceMin);
+  const now = Date.now();
+  const [areas, sessions, waiters, reservations] = await Promise.all([
     tdb.area.findMany({
       orderBy: { sortOrder: "asc" },
       include: { tables: { where: { archivedAt: null }, orderBy: { number: "asc" } } },
@@ -22,6 +27,12 @@ export async function getSalaData(tdb: TenantDb) {
     tdb.membership.findMany({
       where: { active: true, OR: [{ role: "MOZO" }, { extraRoles: { has: "MOZO" } }] },
       include: { user: { select: { name: true } } },
+    }),
+    // Próximas reservas (las que todavía esperan llegar, en las próximas 4 h).
+    tdb.reservation.findMany({
+      where: { status: "CONFIRMED", startsAt: { lt: new Date(now + 4 * 60 * 60_000) } },
+      orderBy: { startsAt: "asc" },
+      include: { tables: { select: { tableId: true } } },
     }),
   ]);
 
@@ -86,6 +97,15 @@ export async function getSalaData(tdb: TenantDb) {
     waiters: waiters
       .map((w) => ({ id: w.id, name: w.user.name }))
       .sort((a, b) => a.name.localeCompare(b.name)),
+    reservations: reservations.map((r) => ({
+      id: r.id,
+      startsAt: r.startsAt.toISOString(),
+      name: r.customerName,
+      party: r.partySize,
+      notes: r.notes,
+      tableIds: r.tables.map((t) => t.tableId),
+    })),
+    timezone: cfg.timezone,
   };
 }
 
@@ -111,3 +131,4 @@ export async function getClosedToday(tdb: TenantDb) {
 export type SalaData = Awaited<ReturnType<typeof getSalaData>>;
 export type SalaTable = SalaData["areas"][number]["tables"][number];
 export type SalaSession = SalaData["sessions"][number];
+export type SalaReservation = SalaData["reservations"][number];
