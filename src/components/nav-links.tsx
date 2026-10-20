@@ -10,6 +10,7 @@ import {
   ChefHat,
   LayoutDashboard,
   LayoutGrid,
+  Layers,
   Settings,
   ShoppingCart,
   UtensilsCrossed,
@@ -34,6 +35,7 @@ const ICONS = {
   caja: Wallet,
   sala: Armchair,
   compras: ShoppingCart,
+  planes: Layers,
 };
 
 export type NavIcon = keyof typeof ICONS;

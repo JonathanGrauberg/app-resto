@@ -18,6 +18,7 @@
  * Los degradados de imágenes usan `--bg`, así que en oscuro funden a negro y en claro a blanco.
  */
 :root {
+  /* ── MARCA: colores principales de la aplicación (claro). Oscuro: más abajo. ── */
   --bg: #fbfaf7;
   --surface: #ffffff;
   --ink: #1a1714;

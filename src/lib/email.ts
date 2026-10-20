@@ -1,4 +1,5 @@
 import "server-only";
+import { BRAND } from "@/lib/brand";
 
 /**
  * Email transaccional con Resend (API HTTP, sin SDK).
@@ -14,7 +15,7 @@ export async function sendEmail(msg: { to: string; subject: string; html: string
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        from: process.env.EMAIL_FROM || "Reservas <onboarding@resend.dev>",
+        from: process.env.EMAIL_FROM || `${BRAND.emailFromName} <onboarding@resend.dev>`,
         to: [msg.to],
         subject: msg.subject,
         html: msg.html,

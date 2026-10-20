@@ -1,11 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { ModuleKey } from "@/generated/prisma/enums";
 import { requirePlatformAdmin } from "@/lib/auth/guards";
 import { hashSecret } from "@/lib/auth/password";
 import { db } from "@/lib/db";
+import { PLANS } from "@/lib/plans";
 import { isCountry, regionSettingsFor } from "@/lib/region";
 import { isValidSlug } from "@/lib/reserved-slugs";
 
@@ -22,6 +24,7 @@ const schema = z.object({
   ownerEmail: z.email("Email no válido").transform((v) => v.trim().toLowerCase()),
   ownerPassword: z.string().min(8, "La contraseña inicial debe tener al menos 8 caracteres"),
   country: z.string().refine(isCountry, "País no válido"),
+  plan: z.string().refine((v) => PLANS.some((p) => p.id === v), "Plan no válido"),
 });
 
 export async function createTenant(_: CreateTenantState, formData: FormData): Promise<CreateTenantState> {
@@ -34,15 +37,16 @@ export async function createTenant(_: CreateTenantState, formData: FormData): Pr
 
   const passwordHash = await hashSecret(d.ownerPassword);
 
-  await db.$transaction(async (tx) => {
+  const plan = PLANS.find((p) => p.id === d.plan)!;
+  const tenant = await db.$transaction(async (tx) => {
     const tenant = await tx.tenant.create({
       data: {
         slug: d.slug,
         name: d.name,
         // País: moneda, zona horaria, medios de pago y textos legales del local.
         settings: { create: regionSettingsFor(d.country as "ES" | "AR") },
-        // Plan base: solo carta QR. El resto se activa desde la plataforma.
-        modules: { create: [{ module: "CARTA_QR" }] },
+        // Módulos del plan elegido; se ajustan uno por uno desde la ficha del local.
+        modules: { create: plan.modules.map((module) => ({ module })) },
       },
     });
     const user = await tx.user.upsert({
@@ -51,10 +55,11 @@ export async function createTenant(_: CreateTenantState, formData: FormData): Pr
       create: { email: d.ownerEmail, name: d.ownerName, passwordHash },
     });
     await tx.membership.create({ data: { tenantId: tenant.id, userId: user.id, role: "OWNER" } });
+    return tenant;
   });
 
-  revalidatePath("/platform");
-  return { ok: `Local "${d.name}" creado en /${d.slug}` };
+  revalidatePath("/platform", "layout");
+  redirect(`/platform/locales/${tenant.id}?ok=${encodeURIComponent(`Local "${d.name}" creado`)}`);
 }
 
 export async function toggleModule(tenantId: string, module: ModuleKey, enabled: boolean) {
@@ -66,11 +71,43 @@ export async function toggleModule(tenantId: string, module: ModuleKey, enabled:
     update: { enabled },
     create: { tenantId, module, enabled },
   });
-  revalidatePath("/platform");
+  revalidatePath("/platform", "layout");
+}
+
+/** Vencimiento de un módulo (prueba gratis, plan pago hasta…). Vacío = sin vencimiento. */
+export async function setModuleExpiry(tenantId: string, module: ModuleKey, formData: FormData) {
+  await requirePlatformAdmin();
+  if (!Object.values(ModuleKey).includes(module)) throw new Error("Módulo inválido");
+  const raw = String(formData.get("expiresAt") ?? "");
+  const expiresAt = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? new Date(`${raw}T23:59:59Z`) : null;
+  await db.tenantModule.upsert({
+    where: { tenantId_module: { tenantId, module } },
+    update: { expiresAt },
+    create: { tenantId, module, enabled: true, expiresAt },
+  });
+  revalidatePath("/platform", "layout");
+}
+
+/** Deja el local exactamente con los módulos de un plan. */
+export async function applyPlan(tenantId: string, planId: string) {
+  await requirePlatformAdmin();
+  const plan = PLANS.find((p) => p.id === planId);
+  if (!plan) throw new Error("Plan inválido");
+  await db.$transaction([
+    db.tenantModule.updateMany({ where: { tenantId, module: { notIn: plan.modules } }, data: { enabled: false } }),
+    ...plan.modules.map((module) =>
+      db.tenantModule.upsert({
+        where: { tenantId_module: { tenantId, module } },
+        update: { enabled: true },
+        create: { tenantId, module, enabled: true },
+      }),
+    ),
+  ]);
+  revalidatePath("/platform", "layout");
 }
 
 export async function toggleTenantActive(tenantId: string, active: boolean) {
   await requirePlatformAdmin();
   await db.tenant.update({ where: { id: tenantId }, data: { active } });
-  revalidatePath("/platform");
+  revalidatePath("/platform", "layout");
 }

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { BRAND } from "@/lib/brand";
 
 /** Landing provisoria (se reemplaza cuando haya nombre y branding). */
 export default function Home() {
@@ -14,7 +15,7 @@ export default function Home() {
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center px-4 py-12">
-      <p className="text-sm font-medium uppercase tracking-wider text-brand">app-resto · demo local</p>
+      <p className="text-sm font-medium uppercase tracking-wider text-brand">{BRAND.name} · demo local</p>
       <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
         Carta QR, pedidos, sala, cocina, caja y reservas para tu restaurante.
       </h1>

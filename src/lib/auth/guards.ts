@@ -13,7 +13,7 @@ export async function requireUser() {
   return session;
 }
 
-/** Exige admin de plataforma (equipo app-resto). */
+/** Exige admin de plataforma (el equipo dueño de la aplicación). */
 export async function requirePlatformAdmin() {
   const session = await requireUser();
   if (!session.user.isPlatformAdmin) forbidden();

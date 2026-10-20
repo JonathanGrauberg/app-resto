@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { LogOut } from "lucide-react";
 import { logout } from "@/app/login/actions";
+import { BrandMark } from "./brand-mark";
 import { NavLinks, type NavIcon } from "./nav-links";
 
 export type NavItem = { href: string; label: string; icon: NavIcon };
@@ -26,8 +27,8 @@ export function AppShell({
     <div className="flex min-h-dvh flex-1">
       <aside className="sticky top-0 hidden h-dvh print:!hidden w-60 shrink-0 flex-col border-r border-line bg-surface md:flex">
         <div className="border-b border-line px-5 py-4">
-          <Link href="/" className="text-xs font-medium uppercase tracking-wider text-muted">
-            app-resto
+          <Link href="/" className="text-xs uppercase tracking-wider text-muted">
+            <BrandMark className="font-medium" />
           </Link>
           <p className="truncate text-lg font-semibold">{title}</p>
           {subtitle && <p className="truncate text-xs text-muted">{subtitle}</p>}
