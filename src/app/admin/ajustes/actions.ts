@@ -7,6 +7,7 @@ import { fail, optionalText, optionalUrl, success, type ActionState } from "@/li
 import { requireTenantRole } from "@/lib/auth/guards";
 import { ADMIN_ROLES } from "@/lib/auth/permissions";
 import { db } from "@/lib/db";
+import { isCountry, regionSettingsFor } from "@/lib/region";
 import { confirmImage, deleteImageByUrl } from "@/lib/storage";
 
 const schema = z.object({
@@ -24,6 +25,8 @@ const schema = z.object({
   coverKey: z.string().default(""),
   logoKey: z.string().default(""),
   shareKey: z.string().default(""),
+  country: z.string().refine(isCountry, "País no válido"),
+  timezone: z.string().optional(),
 });
 
 /** "" = sin cambios · "remove" = quitar · clave = nueva imagen (validada contra R2). */
@@ -38,7 +41,9 @@ export async function updateSettings(_: ActionState, formData: FormData): Promis
   const { tenant } = await requireTenantRole(ADMIN_ROLES);
   const parsed = schema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return fail(parsed.error);
-  const { name, coverKey, logoKey, shareKey, ...settings } = parsed.data;
+  const { name, coverKey, logoKey, shareKey, country, timezone, ...rest } = parsed.data;
+  // País → moneda, formato y zona horaria coherentes (nunca combinaciones sueltas).
+  const settings = { ...rest, ...regionSettingsFor(country as "ES" | "AR", timezone) };
 
   const [cover, logo, share] = await Promise.all([
     resolveImage(tenant.id, coverKey),

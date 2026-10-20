@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeft, Minus, Plus, Search, Send, X } from "lucide-react";
-import { cn, formatPrice } from "@/lib/format";
+import { cn } from "@/lib/format";
+import { useRegion } from "@/components/region-provider";
 import type { PublicMenu, PublicProduct } from "@/lib/public-menu";
 import { matchesQuery } from "@/lib/search";
 import { createStaffOrder } from "@/app/staff/sala-actions";
@@ -40,6 +41,7 @@ export function StaffOrderComposer({
   onClose: () => void;
   onDone: () => void;
 }) {
+  const { formatPrice } = useRegion();
   const [query, setQuery] = useState("");
   const [cat, setCat] = useState<string | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
@@ -325,6 +327,7 @@ function OptionsPicker({
   onCancel: () => void;
   onAdd: (optionIds: string[], notes: string) => void;
 }) {
+  const { formatPrice } = useRegion();
   const [selected, setSelected] = useState<Record<string, string[]>>({});
   const [notes, setNotes] = useState("");
   const missing = p.modifierGroups.some((g) => (selected[g.id]?.length ?? 0) < g.minSelect);

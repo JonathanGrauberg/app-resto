@@ -32,6 +32,8 @@ export default async function AdminAjustesPage() {
           googleReviewUrl: s?.googleReviewUrl ?? null,
           menuTheme: s?.menuTheme ?? "DARK",
           prepMode: s?.prepMode ?? "SEPARATE",
+          country: s?.country ?? "ES",
+          timezone: s?.timezone ?? "Europe/Madrid",
         }}
       />
     </>

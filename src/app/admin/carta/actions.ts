@@ -8,6 +8,8 @@ import { checkbox, fail, optionalText, priceInput, success, type ActionState } f
 import { requireTenantRole } from "@/lib/auth/guards";
 import { ADMIN_ROLES } from "@/lib/auth/permissions";
 import { confirmImage, deleteImageByUrl } from "@/lib/storage";
+import type { Region } from "@/lib/region";
+import { getRegion } from "@/lib/region-server";
 import type { TenantDb } from "@/lib/tenant-db";
 
 async function auth() {
@@ -116,11 +118,12 @@ function optionsJson(min: number, minMessage = "Agregá al menos una opción") {
     .pipe(z.array(optionSchema).min(min, minMessage).max(20, "Máximo 20 opciones"));
 }
 
-const productSchema = z.object({
+const productSchemaFor = (region: Region) =>
+  z.object({
   id: z.string().optional(),
   name: z.string().trim().min(1, "Poné un nombre").max(80),
   description: optionalText.pipe(z.string().max(300, "Máximo 300 caracteres").nullable()),
-  price: priceInput,
+  price: priceInput(region),
   categoryId: z.string().min(1, "Elegí una categoría"),
   station: z.enum(PrepStation),
   allergens: z.array(z.enum(Allergen)),
@@ -136,7 +139,7 @@ const productSchema = z.object({
   ownExtras: optionsJson(0),
   /** "" = sin cambios · "remove" = quitar · otra cosa = clave de R2 recién subida. */
   imageKey: z.string().default(""),
-});
+  });
 
 /** Verifica que los ids recibidos del formulario pertenezcan al tenant. */
 async function ownedIds(tdb: TenantDb, categoryId: string, groupIds: string[]) {
@@ -149,7 +152,7 @@ async function ownedIds(tdb: TenantDb, categoryId: string, groupIds: string[]) {
 
 export async function saveProduct(_: ActionState, formData: FormData): Promise<ActionState> {
   const { tdb, tenant } = await auth();
-  const parsed = productSchema.safeParse({
+  const parsed = productSchemaFor(await getRegion(tenant.id)).safeParse({
     ...Object.fromEntries(formData),
     allergens: formData.getAll("allergens"),
     modifierGroupIds: formData.getAll("modifierGroupIds"),

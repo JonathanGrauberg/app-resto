@@ -3,23 +3,18 @@
 import { useRef, useState, type KeyboardEvent } from "react";
 import { Plus, X } from "lucide-react";
 import { Input } from "@/components/ui/field";
-import { formatPrice } from "@/lib/format";
+import { useRegion } from "@/components/region-provider";
 
 export type Extra = { name: string; extraPriceCents: number };
-
-/** Precio escrito por humanos ("1,5", "2", "") → céntimos; null si no es válido. */
-function parseCents(v: string) {
-  const s = v.replace(/\s|€|\+/g, "").replace(",", ".");
-  if (s === "") return 0;
-  if (!/^\d{1,4}(\.\d{1,2})?$/.test(s)) return null;
-  return Math.round(Number(s) * 100);
-}
 
 /**
  * "Extras de este plato": se escriben, se agregan con + (o Enter) y quedan como chips.
  * Se envían con el formulario del producto en el campo oculto `ownExtras`.
  */
 export function OwnExtrasEditor({ initial }: { initial: Extra[] }) {
+  const { formatPrice, parsePrice, symbol } = useRegion();
+  // Precio escrito por humanos ("1,5", "2", "") → centésimos; vacío = sin cargo; null si no es válido.
+  const parseCents = (v: string) => (v.replace(/[\s+]/g, "") === "" ? 0 : parsePrice(v.replace("+", "")));
   const [extras, setExtras] = useState<Extra[]>(initial);
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
@@ -86,7 +81,7 @@ export function OwnExtrasEditor({ initial }: { initial: Extra[] }) {
           className="flex-1"
         />
         <div className="relative w-28 shrink-0">
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">+€</span>
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">+{symbol}</span>
           <Input
             value={price}
             onChange={(e) => setPrice(e.target.value)}

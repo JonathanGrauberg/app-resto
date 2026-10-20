@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { Minus, Plus, Users } from "lucide-react";
-import { cn, formatPrice } from "@/lib/format";
+import { cn } from "@/lib/format";
+import { useRegion } from "@/components/region-provider";
 import type { Receipt } from "@/lib/receipt";
 
 type Mode = "persona" | "iguales" | "detalle";
@@ -14,6 +15,7 @@ type Mode = "persona" | "iguales" | "detalle";
  * - Detalle: lista única de lo consumido (platos repetidos sumados) y quién lo pidió.
  */
 export function SplitBill({ receipt: r }: { receipt: Receipt }) {
+  const { formatPrice } = useRegion();
   const hasPeople = r.people.length > 1;
   const [mode, setMode] = useState<Mode>(hasPeople ? "persona" : "iguales");
   const [n, setN] = useState(Math.max(1, r.guests));

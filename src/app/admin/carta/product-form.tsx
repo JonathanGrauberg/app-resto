@@ -9,7 +9,8 @@ import { Button, ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field, FormError, Input, Select, Switch, Textarea } from "@/components/ui/field";
 import { ALLERGENS, ALLERGEN_KEYS } from "@/lib/allergens";
-import { cn, formatPrice } from "@/lib/format";
+import { cn } from "@/lib/format";
+import { useRegion } from "@/components/region-provider";
 import { createCategory, saveProduct } from "./actions";
 import { OwnExtrasEditor, type Extra } from "./own-extras-editor";
 import { useFormAction } from "@/lib/use-form-action";
@@ -47,13 +48,14 @@ export function ProductForm({
   categories: { id: string; name: string }[];
   groups: { id: string; name: string; summary: string }[];
 }) {
+  const { formatPrice, parsePrice, symbol, country } = useRegion();
   const [state, action, pending] = useFormAction(saveProduct, undefined);
   const fe = state?.fieldErrors ?? {};
   // Vista previa en vivo de la tarjeta de la carta.
   const [name, setName] = useState(values.name);
   const [price, setPrice] = useState(values.price);
   const [station, setStation] = useState(values.station);
-  const previewCents = Math.round(Number(price.replace(",", ".")) * 100);
+  const previewCents = parsePrice(price) ?? NaN;
 
   return (
     <form onSubmit={action} className="grid gap-6 lg:grid-cols-[1fr_320px] lg:items-start">
@@ -68,7 +70,7 @@ export function ProductForm({
             <Textarea id="description" name="description" defaultValue={values.description} maxLength={300} />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Precio (€)" htmlFor="price" hint="IVA incluido. Ej.: 9,50" error={fe.price}>
+            <Field label={`Precio (${symbol})`} htmlFor="price" hint={country.priceHint} error={fe.price}>
               <Input
                 id="price"
                 name="price"
@@ -116,7 +118,7 @@ export function ProductForm({
         <Card className="p-4 sm:p-6">
           <h2 className="font-semibold">Alérgenos</h2>
           <p className="mb-3 text-sm text-muted">
-            Obligatorio informar los 14 alérgenos del Reglamento UE 1169/2011 (también en bebidas).
+            {country.allergenNote}
           </p>
           <div className="flex flex-wrap gap-2">
             {ALLERGEN_KEYS.map((a) => (

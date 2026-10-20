@@ -6,6 +6,10 @@ import { Badge, Card } from "@/components/ui/card";
 import { requireTenantRole } from "@/lib/auth/guards";
 import { ADMIN_ROLES } from "@/lib/auth/permissions";
 import { MODULES, getEnabledModules } from "@/lib/modules";
+import { periodOf, purchaseSummary } from "@/lib/purchases";
+import { formatMoney } from "@/lib/region";
+import { getRegion } from "@/lib/region-server";
+import { cn } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Inicio" };
 
@@ -21,6 +25,18 @@ export default async function AdminHome() {
     tdb.tableSession.count({ where: { status: { not: "CLOSED" } } }),
     getEnabledModules(tenant.id),
   ]);
+
+  // Compras: vendido vs comprado de la semana y del mes, a la vista apenas se entra.
+  const region = await getRegion(tenant.id);
+  const money = (c: number) => formatMoney(c, region);
+  const balance = modules.has("COMPRAS")
+    ? await Promise.all(
+        (["semana", "mes"] as const).map(async (k) => {
+          const p = periodOf(k, undefined, region.timezone, region.locale);
+          return { kind: k, label: k === "semana" ? "Esta semana" : "Este mes", ...(await purchaseSummary(tdb, p.from, p.to)) };
+        }),
+      )
+    : null;
 
   const stats = [
     { label: "Mesas ocupadas", value: `${openSessions}/${tables}`, href: "/admin/mesas" },
@@ -56,6 +72,35 @@ export default async function AdminHome() {
           </Link>
         ))}
       </div>
+
+      {balance && (
+        <>
+          <h2 className="mb-3 mt-8 font-semibold">Vendido vs comprado</h2>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {balance.map((b) => (
+              <Link key={b.kind} href={`/admin/compras?periodo=${b.kind}`}>
+                <Card className="p-4 transition-colors hover:border-brand">
+                  <p className="text-sm text-muted">{b.label}</p>
+                  <div className="mt-2 grid grid-cols-3 gap-2 text-sm">
+                    <div>
+                      <p className="text-xs text-muted">Vendido</p>
+                      <p className="font-semibold tabular-nums">{money(b.soldCents)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted">Comprado</p>
+                      <p className="font-semibold tabular-nums">{money(b.purchasedCents)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted">Resultado</p>
+                      <p className={cn("font-bold tabular-nums", b.resultCents >= 0 ? "text-ok" : "text-danger")}>{money(b.resultCents)}</p>
+                    </div>
+                  </div>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
 
       <h2 className="mb-3 mt-8 font-semibold">Módulos del plan</h2>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

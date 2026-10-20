@@ -23,6 +23,7 @@ enum ModuleKey {
   RESERVAS
   BI
   MULTI_IDIOMA
+  COMPRAS
 }
 
 model Tenant {
@@ -46,6 +47,7 @@ model Tenant {
   orderItems     OrderItem[]
   reservations   Reservation[]
   waitlist       WaitlistEntry[]
+  purchases      Purchase[]
   events         Event[]
   notifications  Notification[]
   translations   Translation[]
@@ -82,6 +84,8 @@ model TenantSettings {
   facebookUrl     String?
   websiteUrl      String?
   googleReviewUrl String?
+  /// País: define moneda, zona horaria, medios de pago y textos legales (ver src/lib/region.ts).
+  country         String    @default("ES")
   currency        String    @default("EUR")
   locale          String    @default("es-ES")
   timezone        String    @default("Europe/Madrid")
@@ -663,10 +667,45 @@ model Notification {
 // Caja: pagos y turnos
 // ─────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────
+// Compras (para comparar lo comprado con lo vendido)
+// ─────────────────────────────────────────────────────────────
+
+enum PurchaseCategory {
+  FOOD // mercadería
+  DRINKS // bebidas
+  SUPPLIES // limpieza, descartables, insumos
+  OTHER
+}
+
+/**
+ * Una compra del local: qué, cuánto costó y cuándo.
+ */
+model Purchase {
+  id          String           @id @default(cuid())
+  tenantId    String
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  /// Día de la compra (mediodía en la zona del local, para que no se corra de día).
+  date        DateTime
+  item        String
+  /// Texto libre: "10 kg", "2 cajas".
+  quantity    String?
+  supplier    String?
+  category    PurchaseCategory @default(FOOD)
+  amountCents Int
+  notes       String?
+  createdById String?
+  createdAt   DateTime         @default(now())
+
+  @@index([tenantId, date])
+}
+
 enum PaymentMethod {
   CASH
   CARD
-  BIZUM
+  BIZUM // España
+  MERCADOPAGO // Argentina
+  TRANSFER
   OTHER
 }
 

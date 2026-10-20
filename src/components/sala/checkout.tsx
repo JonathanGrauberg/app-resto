@@ -2,29 +2,30 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { Banknote, CheckCircle2, CreditCard, Gift, Minus, Plus, Printer, Smartphone, Trash2, Wallet, X } from "lucide-react";
-import { cn, formatPrice } from "@/lib/format";
+import { ArrowLeftRight, Banknote, CheckCircle2, CreditCard, Gift, Minus, Plus, Printer, QrCode, Smartphone, Trash2, Wallet, X } from "lucide-react";
+import { cn } from "@/lib/format";
+import { useRegion } from "@/components/region-provider";
 import type { Bill } from "@/lib/billing";
+import { PAY_LABEL, type PayMethod } from "@/lib/region";
 import { checkout, compItem, confirmPayment, getBill, setDiscount } from "@/app/staff/sala-actions";
 
-type Method = "CASH" | "CARD" | "BIZUM" | "OTHER";
-const METHODS: { id: Method; label: string; icon: typeof Banknote }[] = [
-  { id: "CASH", label: "Efectivo", icon: Banknote },
-  { id: "CARD", label: "Tarjeta", icon: CreditCard },
-  { id: "BIZUM", label: "Bizum", icon: Smartphone },
-  { id: "OTHER", label: "Otro", icon: Wallet },
-];
+type Method = PayMethod;
+const ICONS: Record<Method, typeof Banknote> = {
+  CASH: Banknote,
+  CARD: CreditCard,
+  BIZUM: Smartphone,
+  MERCADOPAGO: QrCode,
+  TRANSFER: ArrowLeftRight,
+  OTHER: Wallet,
+};
 
 type Draft = { key: number; method: Method; amount: string; tip: string; received: string };
 
-/** "12,50" → 1250 céntimos (null si no es un importe válido). Vacío = 0. */
-function toCents(v: string) {
-  const s = v.replace(/\s|€/g, "").replace(",", ".");
-  if (s === "") return 0;
-  if (!/^\d{1,6}(\.\d{1,2})?$/.test(s)) return null;
-  return Math.round(Number(s) * 100);
+/** Importe escrito → centésimos en la moneda del local (null si no es válido). Vacío = 0. */
+function useMoneyInput() {
+  const { parsePrice, inputValue } = useRegion();
+  return { toCents: (v: string) => (v.trim() === "" ? 0 : parsePrice(v)), toInput: inputValue };
 }
-const toInput = (cents: number) => (cents / 100).toFixed(2).replace(".", ",");
 
 let seq = 0;
 
@@ -43,6 +44,10 @@ export function CheckoutDialog({
   onClose: () => void;
   onDone: () => void;
 }) {
+  const { formatPrice, symbol, country } = useRegion();
+  const { toCents, toInput } = useMoneyInput();
+  // Medios de pago del país del local.
+  const METHODS = country.payments.map((id) => ({ id, label: PAY_LABEL[id], icon: ICONS[id] }));
   const [bill, setBill] = useState<Bill | null>(null);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [discKind, setDiscKind] = useState<"percent" | "amount">("percent");
@@ -223,7 +228,7 @@ export function CheckoutDialog({
                 onClick={() => setDiscKind(k)}
                 className={cn("rounded-md px-3 py-1.5", discKind === k ? "bg-surface shadow-sm" : "text-muted")}
               >
-                {k === "percent" ? "%" : "€"}
+                {k === "percent" ? "%" : symbol}
               </button>
             ))}
           </div>
@@ -272,7 +277,7 @@ export function CheckoutDialog({
             <span className="font-semibold">Total a cobrar</span>
             <span className="text-3xl font-bold tabular-nums">{formatPrice(bill.totalCents)}</span>
           </div>
-          <p className="text-right text-xs text-muted">IVA incluido</p>
+          <p className="text-right text-xs text-muted">{country.taxNote}</p>
         </div>
 
         <div className="flex-1 space-y-3 overflow-y-auto p-4">
@@ -435,6 +440,8 @@ function MoneyInput({
   onChange: (v: string) => void;
   placeholder?: string;
 }) {
+  const { symbol } = useRegion();
+  const { toCents } = useMoneyInput();
   const bad = toCents(value) === null;
   return (
     <label className="block text-xs text-muted">
@@ -450,7 +457,7 @@ function MoneyInput({
             bad ? "border-danger" : "border-line",
           )}
         />
-        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm">€</span>
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm">{symbol}</span>
       </span>
     </label>
   );

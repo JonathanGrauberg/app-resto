@@ -7,7 +7,8 @@ import { joinNames } from "@/lib/people";
 import { Minus, Plus } from "lucide-react";
 import { Photo } from "@/components/mock-image";
 import { ALLERGENS } from "@/lib/allergens";
-import { cn, formatPrice } from "@/lib/format";
+import { cn } from "@/lib/format";
+import { useRegion } from "@/components/region-provider";
 import type { PublicProduct } from "@/lib/public-menu";
 import { CloseButton } from "./menu-browser";
 
@@ -16,6 +17,7 @@ import { CloseButton } from "./menu-browser";
  * Dentro de una mesa (QR), "Añadir" suma al carrito compartido de la mesa.
  */
 export function ProductSheet({ product: p, onClose }: { product: PublicProduct; onClose: () => void }) {
+  const { formatPrice } = useRegion();
   const table = useTable();
   const [qty, setQty] = useState(1);
   const [selected, setSelected] = useState<Record<string, string[]>>({});

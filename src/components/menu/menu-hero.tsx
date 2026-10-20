@@ -5,7 +5,8 @@ import { ArrowDown, CalendarDays, Globe, MapPin } from "lucide-react";
 import type { MenuTheme } from "@/generated/prisma/enums";
 import { FadeOverlay, Photo } from "@/components/mock-image";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { cn, formatPrice } from "@/lib/format";
+import { cn } from "@/lib/format";
+import { useRegion } from "@/components/region-provider";
 import type { PublicMenu, PublicProduct } from "@/lib/public-menu";
 
 export type Venue = {
@@ -40,6 +41,7 @@ export function MenuHero({
   menu: PublicMenu;
   onOpenProduct: (p: PublicProduct) => void;
 }) {
+  const { formatPrice } = useRegion();
   const slides = menu.map((c) => ({
     category: c,
     // Destacado: el primer plato disponible con foto; si no hay, el primero disponible.

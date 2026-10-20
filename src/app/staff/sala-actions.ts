@@ -10,6 +10,8 @@ import { notifyStaff, notifyTable } from "@/lib/realtime/server";
 import { buildModifiers, unitPrice, type Modifier } from "@/lib/order-lines";
 import { getPrepMode, routeStations } from "@/lib/prep";
 import { computeBill } from "@/lib/billing";
+import { COUNTRIES, formatMoney, type PayMethod } from "@/lib/region";
+import { getRegion } from "@/lib/region-server";
 import { ensureReceipt } from "@/lib/receipt";
 import { tableLabelOf } from "@/lib/table-session";
 import type { TenantDb } from "@/lib/tenant-db";
@@ -261,7 +263,7 @@ async function finish(tdb: TenantDb, sessionId: string, ids: string[]) {
 
 /** Caja confirma el cobro: la mesa se libera y su QR vuelve a funcionar para los próximos comensales. */
 export type PaymentInput = {
-  method: "CASH" | "CARD" | "BIZUM" | "OTHER";
+  method: PayMethod;
   amountCents: number;
   tipCents?: number;
   /** Solo efectivo: con cuánto pagó (para el cambio). */
@@ -281,9 +283,11 @@ export async function checkout(sessionId: string, payments: PaymentInput[]): Pro
   if (!Array.isArray(payments) || payments.length > 20) return err("Pagos no válidos");
 
   const bill = await computeBill(tdb, sessionId);
+  const region = await getRegion(tenant.id);
+  const allowed = COUNTRIES[region.country].payments;
   const clean: PaymentInput[] = [];
   for (const p of payments) {
-    if (!["CASH", "CARD", "BIZUM", "OTHER"].includes(p.method)) return err("Forma de pago no válida");
+    if (!allowed.includes(p.method)) return err("Forma de pago no válida");
     const amount = Math.round(p.amountCents);
     const tip = Math.round(p.tipCents ?? 0);
     if (!(amount > 0) || amount > 10_000_000 || tip < 0 || tip > 1_000_000) return err("Importe no válido");
@@ -295,8 +299,8 @@ export async function checkout(sessionId: string, payments: PaymentInput[]): Pro
   if (paying !== bill.remainingCents) {
     return err(
       paying < bill.remainingCents
-        ? `Faltan ${((bill.remainingCents - paying) / 100).toFixed(2).replace(".", ",")} € para cubrir la cuenta`
-        : `Se cobra de más: sobran ${((paying - bill.remainingCents) / 100).toFixed(2).replace(".", ",")} €`,
+        ? `Faltan ${formatMoney(bill.remainingCents - paying, region)} para cubrir la cuenta`
+        : `Se cobra de más: sobran ${formatMoney(paying - bill.remainingCents, region)}`,
     );
   }
 

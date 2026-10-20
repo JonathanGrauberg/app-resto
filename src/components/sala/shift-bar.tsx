@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { LockKeyholeOpen, Vault } from "lucide-react";
-import { formatPrice } from "@/lib/format";
+import { useRegion } from "@/components/region-provider";
 import { openShift } from "@/app/staff/caja/shift-actions";
 
 /** Estado del turno de caja: abrir con efectivo inicial, o resumen rápido + cerrar. */
@@ -13,6 +13,7 @@ export function ShiftBar({
 }: {
   shift: { id: string; openedAt: string; salesCents: number; tipsCents: number; expectedCashCents: number; tables: number } | null;
 }) {
+  const { formatPrice, symbol } = useRegion();
   const router = useRouter();
   const [cash, setCash] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +47,7 @@ export function ShiftBar({
             placeholder="Efectivo inicial"
             className="h-11 w-40 rounded-xl border border-line bg-surface pl-3 pr-7 text-base sm:text-sm"
           />
-          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted">€</span>
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted">{symbol}</span>
         </label>
         <button disabled={pending} className="h-11 rounded-xl bg-ink px-5 text-sm font-semibold text-bg disabled:opacity-50">
           Abrir turno

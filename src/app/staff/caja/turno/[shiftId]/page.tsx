@@ -4,18 +4,24 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requireTenantRole } from "@/lib/auth/guards";
 import { METHOD_LABEL } from "@/lib/billing";
-import { cn, formatPrice } from "@/lib/format";
+import { cn } from "@/lib/format";
+import { COUNTRIES, formatMoney } from "@/lib/region";
+import { getRegion } from "@/lib/region-server";
 import { shiftSummary } from "@/lib/shift";
 import { CloseShiftForm, PrintButton } from "./close-shift-form";
 
 export const metadata: Metadata = { title: "Turno de caja" };
 
-const dt = (iso: string) =>
-  new Date(iso).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" });
 
 /** Resumen y arqueo de un turno de caja (imprimible). */
 export default async function ShiftPage({ params }: PageProps<"/staff/caja/turno/[shiftId]">) {
   const { tdb, tenant } = await requireTenantRole(["OWNER", "ADMIN", "CAJA"], "CAJA");
+  const region = await getRegion(tenant.id);
+  const formatPrice = (cents: number) => formatMoney(cents, region);
+  const dt = (iso: string) =>
+    new Date(iso).toLocaleString(region.locale, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: region.timezone });
+  // Medios del país, más cualquier otro que se haya usado en el turno.
+  const methods = COUNTRIES[region.country].payments;
   const { shiftId } = await params;
   const exists = await tdb.cashShift.findUnique({ where: { id: shiftId }, select: { id: true } });
   if (!exists) notFound();
@@ -41,7 +47,7 @@ export default async function ShiftPage({ params }: PageProps<"/staff/caja/turno
           <h2 className="mb-2 text-sm font-semibold">Cobrado por forma de pago</h2>
           <table className="w-full text-sm">
             <tbody className="divide-y divide-line">
-              {s.byMethod.map((m) => (
+              {s.byMethod.filter((m) => m.count > 0 || methods.includes(m.method)).map((m) => (
                 <tr key={m.method} className={cn(m.count === 0 && "text-muted")}>
                   <td className="py-2">{METHOD_LABEL[m.method]}</td>
                   <td className="py-2 text-right text-muted">{m.count === 1 ? "1 pago" : `${m.count} pagos`}</td>

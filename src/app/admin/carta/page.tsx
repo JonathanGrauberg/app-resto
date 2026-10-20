@@ -9,14 +9,17 @@ import { FormSuccess } from "@/components/ui/field";
 import { ALLERGENS } from "@/lib/allergens";
 import { requireTenantRole } from "@/lib/auth/guards";
 import { ADMIN_ROLES } from "@/lib/auth/permissions";
-import { formatPrice } from "@/lib/format";
+import { formatMoney } from "@/lib/region";
+import { getRegion } from "@/lib/region-server";
 import { CategoryHeader } from "./category-forms";
 import { ProductRowActions } from "./product-row-actions";
 
 export const metadata: Metadata = { title: "Carta" };
 
 export default async function AdminCartaPage({ searchParams }: PageProps<"/admin/carta">) {
-  const { tdb } = await requireTenantRole(ADMIN_ROLES);
+  const { tdb, tenant } = await requireTenantRole(ADMIN_ROLES);
+  const region = await getRegion(tenant.id);
+  const formatPrice = (cents: number) => formatMoney(cents, region);
   const { ok } = await searchParams;
 
   const categories = await tdb.category.findMany({

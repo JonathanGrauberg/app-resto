@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_REGION, parseMoney, type Region } from "@/lib/region";
 
 /** Estado estándar que devuelven las Server Actions de formularios. */
 export type ActionState =
@@ -40,13 +41,19 @@ export const optionalUrl = z
   .transform((v) => (v === "" ? null : v))
   .refine((v) => v === null || /^https?:\/\/\S+\.\S+/.test(v), "Debe empezar con https://");
 
-/** Precio en euros escrito por humanos ("9,50", "9.5", "10") → céntimos. */
-export const priceInput = z
-  .string()
-  .trim()
-  .transform((v) => v.replace(/\s|€/g, "").replace(",", "."))
-  .refine((v) => /^\d{1,5}(\.\d{1,2})?$/.test(v), "Precio no válido (ej. 9,50)")
-  .transform((v) => Math.round(Number(v) * 100));
+/** Precio escrito por humanos en la moneda del local ("9,50" € · "12.500" $) → centésimos. */
+export const priceInput = (region: Pick<Region, "currency"> = DEFAULT_REGION) =>
+  z
+    .string()
+    .trim()
+    .transform((v, ctx) => {
+      const cents = parseMoney(v, region);
+      if (cents === null) {
+        ctx.addIssue({ code: "custom", message: region.currency === "EUR" ? "Precio no válido (ej. 9,50)" : "Precio no válido (ej. 12.500)" });
+        return z.NEVER;
+      }
+      return cents;
+    });
 
 /** Checkbox de formulario → boolean. Desmarcado no viaja en el formulario: el campo es opcional. */
 export const checkbox = z

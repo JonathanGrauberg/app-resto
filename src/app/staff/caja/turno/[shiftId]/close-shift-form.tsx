@@ -3,19 +3,19 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Printer } from "lucide-react";
-import { formatPrice } from "@/lib/format";
+import { useRegion } from "@/components/region-provider";
 import { closeShift } from "../../shift-actions";
 
 /** Arqueo: contar el efectivo del cajón y cerrar el turno. Muestra la diferencia antes de confirmar. */
 export function CloseShiftForm({ shiftId, expectedCents }: { shiftId: string; expectedCents: number }) {
+  const { formatPrice, parsePrice, symbol } = useRegion();
   const router = useRouter();
   const [counted, setCounted] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
-  const parsed = Number(counted.replace(/\s|€/g, "").replace(",", "."));
-  const countedCents = counted && Number.isFinite(parsed) ? Math.round(parsed * 100) : null;
+  const countedCents = counted ? parsePrice(counted) : null;
   const diff = countedCents == null ? null : countedCents - expectedCents;
 
   return (
@@ -44,7 +44,7 @@ export function CloseShiftForm({ shiftId, expectedCents }: { shiftId: string; ex
               placeholder={(expectedCents / 100).toFixed(2).replace(".", ",")}
               className="h-11 w-full rounded-xl border border-line bg-surface pl-3 pr-7 text-base sm:text-sm"
             />
-            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted">€</span>
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted">{symbol}</span>
           </span>
         </label>
         <div className="flex items-end">
@@ -66,7 +66,7 @@ export function CloseShiftForm({ shiftId, expectedCents }: { shiftId: string; ex
         onChange={(e) => setNotes(e.target.value)}
         maxLength={300}
         rows={2}
-        placeholder="Notas (opcional): ej. faltan 5 € por un cambio mal dado"
+        placeholder="Notas (opcional): ej. falta plata por un cambio mal dado"
         className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-base sm:text-sm"
       />
       {error && <p className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{error}</p>}

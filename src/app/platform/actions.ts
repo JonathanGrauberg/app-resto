@@ -6,6 +6,7 @@ import { ModuleKey } from "@/generated/prisma/enums";
 import { requirePlatformAdmin } from "@/lib/auth/guards";
 import { hashSecret } from "@/lib/auth/password";
 import { db } from "@/lib/db";
+import { isCountry, regionSettingsFor } from "@/lib/region";
 import { isValidSlug } from "@/lib/reserved-slugs";
 
 export type CreateTenantState = { error?: string; ok?: string } | undefined;
@@ -20,6 +21,7 @@ const schema = z.object({
   ownerName: z.string().trim().min(2, "Nombre del dueño requerido"),
   ownerEmail: z.email("Email no válido").transform((v) => v.trim().toLowerCase()),
   ownerPassword: z.string().min(8, "La contraseña inicial debe tener al menos 8 caracteres"),
+  country: z.string().refine(isCountry, "País no válido"),
 });
 
 export async function createTenant(_: CreateTenantState, formData: FormData): Promise<CreateTenantState> {
@@ -37,7 +39,8 @@ export async function createTenant(_: CreateTenantState, formData: FormData): Pr
       data: {
         slug: d.slug,
         name: d.name,
-        settings: { create: {} },
+        // País: moneda, zona horaria, medios de pago y textos legales del local.
+        settings: { create: regionSettingsFor(d.country as "ES" | "AR") },
         // Plan base: solo carta QR. El resto se activa desde la plataforma.
         modules: { create: [{ module: "CARTA_QR" }] },
       },

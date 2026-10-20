@@ -1,7 +1,8 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { FormError, Input, Label } from "@/components/ui/field";
+import { FormError, Input, Label, Select } from "@/components/ui/field";
+import { COUNTRIES } from "@/lib/region";
 import { createTenant } from "./actions";
 import { useFormAction } from "@/lib/use-form-action";
 
@@ -26,7 +27,17 @@ export function CreateTenantForm() {
         <Label htmlFor="ownerEmail">Email del dueño</Label>
         <Input id="ownerEmail" name="ownerEmail" type="email" required />
       </div>
-      <div className="sm:col-span-2">
+      <div>
+        <Label htmlFor="country">País</Label>
+        <Select id="country" name="country" defaultValue="ES">
+          {Object.entries(COUNTRIES).map(([code, c]) => (
+            <option key={code} value={code}>
+              {c.label} · {c.currency}
+            </option>
+          ))}
+        </Select>
+      </div>
+      <div>
         <Label htmlFor="ownerPassword">Contraseña inicial</Label>
         <Input id="ownerPassword" name="ownerPassword" type="password" minLength={8} autoComplete="new-password" required />
       </div>

@@ -13,7 +13,7 @@ export async function shiftSummary(tdb: TenantDb, shiftId: string) {
     include: { payments: { include: { session: { select: { id: true, discountCents: true } } } } },
   });
 
-  const methods = ["CASH", "CARD", "BIZUM", "OTHER"] as const;
+  const methods = ["CASH", "CARD", "BIZUM", "MERCADOPAGO", "TRANSFER", "OTHER"] as const;
   const byMethod = methods.map((m) => {
     const ps = shift.payments.filter((p) => p.method === m);
     return {

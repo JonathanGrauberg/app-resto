@@ -3,6 +3,7 @@ import { Clock, ReceiptText } from "lucide-react";
 import { MenuThemeScript } from "@/components/menu/menu-theme-script";
 import { getPublicTenant } from "@/lib/public-menu";
 import { receiptByToken } from "@/lib/receipt";
+import { COUNTRIES, regionOf } from "@/lib/region";
 import { SplitBill } from "./split-bill";
 
 export const metadata: Metadata = { title: "Tu cuenta", robots: { index: false } };
@@ -30,6 +31,7 @@ export default async function ReceiptPage({ params }: PageProps<"/[slug]/cuenta/
   }
 
   const r = result.receipt;
+  const region = regionOf(tenant?.settings);
   return (
     <main className="mx-auto w-full max-w-xl flex-1 px-4 py-8">
       {tenant && <MenuThemeScript slug={tenant.slug} theme={tenant.settings?.menuTheme ?? "DARK"} />}
@@ -39,7 +41,7 @@ export default async function ReceiptPage({ params }: PageProps<"/[slug]/cuenta/
           <ReceiptText className="size-6" aria-hidden /> Cuenta · Mesa {r.tableLabel}
         </h1>
         <p className="mt-1 text-sm text-muted">
-          {new Date(r.openedAt).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Madrid" })}
+          {new Date(r.openedAt).toLocaleDateString(region.locale, { weekday: "long", day: "numeric", month: "long", timeZone: region.timezone })}
           {r.status === "CLOSED" ? " · Pagada" : " · Pendiente de pago"}
         </p>
       </header>
@@ -47,9 +49,9 @@ export default async function ReceiptPage({ params }: PageProps<"/[slug]/cuenta/
       <SplitBill receipt={r} />
 
       <p className="mt-8 text-center text-xs text-muted">
-        Documento informativo · No válido como factura · IVA incluido
+        Documento informativo · No válido como factura · {COUNTRIES[region.country].taxNote}
         {r.expiresAt &&
-          ` · Disponible hasta el ${new Date(r.expiresAt).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" })}`}
+          ` · Disponible hasta el ${new Date(r.expiresAt).toLocaleString(region.locale, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: region.timezone })}`}
       </p>
     </main>
   );

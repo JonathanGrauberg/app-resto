@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { Check, HandPlatter, ReceiptText, X } from "lucide-react";
-import { cn, formatPrice } from "@/lib/format";
+import { cn } from "@/lib/format";
+import { useRegion } from "@/components/region-provider";
 import { itemPhase, PHASE_LABEL } from "@/lib/item-status";
 import { groupByPerson } from "@/lib/people";
 import type { SalaSession } from "@/lib/sala";
@@ -18,6 +19,7 @@ const time = (iso: string) => new Date(iso).toLocaleTimeString("es-ES", { hour: 
  * El personal sí ve importes.
  */
 export function OrdersSection({ session, onDone }: { session: SalaSession; onDone: () => void }) {
+  const { formatPrice } = useRegion();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<string | null>(null);
@@ -189,6 +191,7 @@ export function OrdersSection({ session, onDone }: { session: SalaSession; onDon
 
 /** Ítems de un pedido nuevo, agrupados por persona. */
 function PeopleList({ items }: { items: SalaSession["orders"][number]["items"] }) {
+  const { formatPrice } = useRegion();
   return (
     <div className="space-y-2">
       {groupByPerson(items).map((g) => (

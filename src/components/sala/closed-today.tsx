@@ -1,7 +1,9 @@
+"use client";
+
 import Link from "next/link";
 import { Printer } from "lucide-react";
 import { LocalTime } from "@/components/local-time";
-import { formatPrice } from "@/lib/format";
+import { useRegion } from "@/components/region-provider";
 
 /** Caja: mesas cobradas en la jornada, con reimpresión de la cuenta (si se perdió el ticket). */
 export function ClosedToday({
@@ -9,6 +11,7 @@ export function ClosedToday({
 }: {
   rows: { id: string; label: string; closedAt: string; totalCents: number; guests: number; waiterName: string | null }[];
 }) {
+  const { formatPrice } = useRegion();
   const total = rows.reduce((n, r) => n + r.totalCents, 0);
   return (
     <section className="mt-10">

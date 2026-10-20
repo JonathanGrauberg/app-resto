@@ -6,7 +6,8 @@ import { PageHeader } from "@/components/app-shell";
 import { ActionButton } from "@/components/ui/action-button";
 import { requireTenantRole } from "@/lib/auth/guards";
 import { ADMIN_ROLES } from "@/lib/auth/permissions";
-import { formatPrice } from "@/lib/format";
+import { formatMoney, moneyInputValue } from "@/lib/region";
+import { getRegion } from "@/lib/region-server";
 import { getPrepMode } from "@/lib/prep";
 import { deleteProduct } from "../../actions";
 import { ProductForm, type ProductValues } from "../../product-form";
@@ -16,6 +17,8 @@ export const metadata: Metadata = { title: "Producto" };
 /** `/admin/carta/producto/nuevo` crea; `/admin/carta/producto/<id>` edita. */
 export default async function ProductPage({ params, searchParams }: PageProps<"/admin/carta/producto/[id]">) {
   const { tdb, tenant } = await requireTenantRole(ADMIN_ROLES);
+  const region = await getRegion(tenant.id);
+  const formatPrice = (cents: number) => formatMoney(cents, region);
   const { id } = await params;
   const { categoria } = await searchParams;
   const isNew = id === "nuevo";
@@ -43,7 +46,7 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
         imageUrl: product.imageUrl,
         name: product.name,
         description: product.description ?? "",
-        price: (product.priceCents / 100).toFixed(2).replace(".", ","),
+        price: moneyInputValue(product.priceCents, region),
         categoryId: product.categoryId,
         station: product.station,
         allergens: product.allergens,

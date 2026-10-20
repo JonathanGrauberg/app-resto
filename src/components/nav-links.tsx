@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   LayoutGrid,
   Settings,
+  ShoppingCart,
   UtensilsCrossed,
   Users,
   Wallet,
@@ -32,6 +33,7 @@ const ICONS = {
   bar: Wine,
   caja: Wallet,
   sala: Armchair,
+  compras: ShoppingCart,
 };
 
 export type NavIcon = keyof typeof ICONS;

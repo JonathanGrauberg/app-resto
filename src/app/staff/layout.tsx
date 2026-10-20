@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { LogOut } from "lucide-react";
 import { logout } from "@/app/login/actions";
+import { RegionProvider } from "@/components/region-provider";
 import { StaffLive } from "@/components/staff-live";
+import { getRegion } from "@/lib/region-server";
 import { requireTenantRole } from "@/lib/auth/guards";
 import { ADMIN_ROLES, CAN_MANAGE_TABLES, hasRole, rolesLabel, rolesOf, STAFF_MANAGER_ROLES, STAFF_ROLES } from "@/lib/auth/permissions";
 import { cn } from "@/lib/format";
@@ -11,7 +13,7 @@ import { staffChannel } from "@/lib/realtime/server";
 /** PWA del personal: cabecera compacta, sin barra lateral, pensada para celular y tablet. */
 export default async function StaffLayout({ children }: LayoutProps<"/staff">) {
   const { tenant, user, membership } = await requireTenantRole(STAFF_ROLES);
-  const prepMode = await getPrepMode(tenant.id);
+  const [prepMode, region] = await Promise.all([getPrepMode(tenant.id), getRegion(tenant.id)]);
   const isAdmin = hasRole(membership, ADMIN_ROLES);
   // Con un solo rol de pantalla (ej. solo cocina) no hace falta menú para cambiar de pantalla.
   const multi = isAdmin || rolesOf(membership).length > 1;
@@ -59,7 +61,9 @@ export default async function StaffLayout({ children }: LayoutProps<"/staff">) {
           </button>
         </form>
       </header>
-      <main className="flex-1 px-4 py-4 sm:px-6 print:p-0">{children}</main>
+      <main className="flex-1 px-4 py-4 sm:px-6 print:p-0">
+        <RegionProvider region={region}>{children}</RegionProvider>
+      </main>
       <StaffLive
         channel={staffChannel(tenant.id)}
         membershipId={membership.id}

@@ -10,6 +10,7 @@ export const MODULES: { key: ModuleKey; label: string; description: string }[] =
   { key: "RESERVAS", label: "Reservas", description: "Reservas públicas, eventos y control de horarios" },
   { key: "BI", label: "Métricas", description: "Rotación, estadía y facturación por mesa" },
   { key: "MULTI_IDIOMA", label: "Multi-idioma", description: "Traducciones propias de la carta" },
+  { key: "COMPRAS", label: "Compras", description: "Carga de compras y comparación con lo vendido (semana / mes)" },
 ];
 
 export async function getEnabledModules(tenantId: string): Promise<Set<ModuleKey>> {

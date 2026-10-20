@@ -5,14 +5,13 @@ import { requireTenantRole } from "@/lib/auth/guards";
 import { CAN_MANAGE_TABLES } from "@/lib/auth/permissions";
 import { baseUrl } from "@/lib/base-url";
 import { METHOD_LABEL } from "@/lib/billing";
-import { formatPrice } from "@/lib/format";
+import { COUNTRIES, formatMoney } from "@/lib/region";
+import { getRegion } from "@/lib/region-server";
 import { ensureReceipt, receiptForStaff } from "@/lib/receipt";
 import { TicketActions } from "./ticket-actions";
 
 export const metadata: Metadata = { title: "Cuenta" };
 
-const time = (iso: string) => new Date(iso).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" });
-const date = (iso: string) => new Date(iso).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Europe/Madrid" });
 
 /**
  * Ticket de la cuenta (documento informativo, no es factura) para impresora térmica de 80 mm.
@@ -20,6 +19,11 @@ const date = (iso: string) => new Date(iso).toLocaleDateString("es-ES", { day: "
  */
 export default async function TicketPage({ params, searchParams }: PageProps<"/staff/cuenta/[sessionId]">) {
   const { tdb, tenant } = await requireTenantRole(CAN_MANAGE_TABLES);
+  const region = await getRegion(tenant.id);
+  const formatPrice = (cents: number) => formatMoney(cents, region);
+  const time = (iso: string) => new Date(iso).toLocaleTimeString(region.locale, { hour: "2-digit", minute: "2-digit", timeZone: region.timezone });
+  const date = (iso: string) =>
+    new Date(iso).toLocaleDateString(region.locale, { day: "2-digit", month: "2-digit", year: "numeric", timeZone: region.timezone });
   const { sessionId } = await params;
   const { auto } = await searchParams;
 
@@ -98,7 +102,7 @@ export default async function TicketPage({ params, searchParams }: PageProps<"/s
           <span>TOTAL</span>
           <span className="tabular-nums">{formatPrice(r.totalCents)}</span>
         </p>
-        <p className="text-right text-[11px]">IVA incluido</p>
+        <p className="text-right text-[11px]">{COUNTRIES[region.country].taxNote}</p>
 
         {r.payments.length > 0 && (
           <>

@@ -5,7 +5,8 @@ import { Filter, Search, X } from "lucide-react";
 import type { Allergen } from "@/generated/prisma/enums";
 import { Photo } from "@/components/mock-image";
 import { ALLERGENS, ALLERGEN_KEYS } from "@/lib/allergens";
-import { cn, formatPrice } from "@/lib/format";
+import { cn } from "@/lib/format";
+import { useRegion } from "@/components/region-provider";
 import type { PublicMenu, PublicProduct } from "@/lib/public-menu";
 import { matchesQuery } from "@/lib/search";
 
@@ -170,6 +171,7 @@ export function MenuBrowser({
 }
 
 function ProductCard({ product: p, onOpen }: { product: PublicProduct; onOpen: () => void }) {
+  const { formatPrice } = useRegion();
   return (
     <button
       onClick={onOpen}

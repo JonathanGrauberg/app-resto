@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Field, FormError, FormSuccess, Input } from "@/components/ui/field";
 import { deleteModifierGroup, saveModifierGroup } from "./actions";
 import { useFormAction } from "@/lib/use-form-action";
+import { useRegion } from "@/components/region-provider";
 
 type Option = { key: string; name: string; extra: string };
 export type GroupValues = {
@@ -21,13 +22,13 @@ export type GroupValues = {
 
 let seq = 0;
 const newKey = () => `o${++seq}`;
-const toOption = (o: { name: string; extraPriceCents: number }): Option => ({
-  key: newKey(),
-  name: o.name,
-  extra: o.extraPriceCents ? (o.extraPriceCents / 100).toFixed(2).replace(".", ",") : "",
-});
-
 export function ModifierGroupForm({ values }: { values: GroupValues }) {
+  const { symbol, parsePrice, inputValue } = useRegion();
+  const toOption = (o: { name: string; extraPriceCents: number }): Option => ({
+    key: newKey(),
+    name: o.name,
+    extra: o.extraPriceCents ? inputValue(o.extraPriceCents) : "",
+  });
   const [state, action, pending] = useFormAction(saveModifierGroup, undefined);
   const [options, setOptions] = useState<Option[]>(() =>
     values.options.length ? values.options.map(toOption) : [toOption({ name: "", extraPriceCents: 0 })],
@@ -46,7 +47,7 @@ export function ModifierGroupForm({ values }: { values: GroupValues }) {
       .filter((o) => o.name.trim())
       .map((o) => ({
         name: o.name.trim(),
-        extraPriceCents: Math.max(0, Math.round(Number(o.extra.replace(",", ".") || "0") * 100) || 0),
+        extraPriceCents: Math.max(0, parsePrice(o.extra.replace("+", "")) ?? 0),
       })),
   );
 
@@ -84,7 +85,7 @@ export function ModifierGroupForm({ values }: { values: GroupValues }) {
                   className="flex-1"
                 />
                 <div className="relative w-28 shrink-0">
-                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">+€</span>
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">+{symbol}</span>
                   <Input
                     value={o.extra}
                     onChange={(e) => update(o.key, { extra: e.target.value })}

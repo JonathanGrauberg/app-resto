@@ -7,7 +7,7 @@ import type { TenantDb } from "@/lib/tenant-db";
  * Lo usan la caja (cobrar), el ticket y las métricas.
  */
 
-export const METHOD_LABEL = { CASH: "Efectivo", CARD: "Tarjeta", BIZUM: "Bizum", OTHER: "Otro" } as const;
+export { PAY_LABEL as METHOD_LABEL } from "@/lib/region";
 
 export async function computeBill(tdb: TenantDb, sessionId: string) {
   const session = await tdb.tableSession.findUniqueOrThrow({

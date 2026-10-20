@@ -4,7 +4,9 @@ import type { MenuTheme, PrepMode } from "@/generated/prisma/enums";
 import { ImageUpload } from "@/components/image-upload";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Field, FormError, FormSuccess, Input, Textarea } from "@/components/ui/field";
+import { Field, FormError, FormSuccess, Input, Select, Textarea } from "@/components/ui/field";
+import { useState } from "react";
+import { COUNTRIES, isCountry, type CountryCode } from "@/lib/region";
 import { cn } from "@/lib/format";
 import { updateSettings } from "./actions";
 import { useFormAction } from "@/lib/use-form-action";
@@ -25,6 +27,8 @@ export type SettingsValues = {
   googleReviewUrl: string | null;
   menuTheme: MenuTheme;
   prepMode: PrepMode;
+  country: string;
+  timezone: string;
 };
 
 const THEMES: { value: MenuTheme; label: string; hint: string; preview: string }[] = [
@@ -36,6 +40,8 @@ const THEMES: { value: MenuTheme; label: string; hint: string; preview: string }
 export function SettingsForm({ values }: { values: SettingsValues }) {
   const [state, action, pending] = useFormAction(updateSettings, undefined);
   const fe = state?.fieldErrors ?? {};
+  const [country, setCountry] = useState<CountryCode>(isCountry(values.country) ? values.country : "ES");
+  const c = COUNTRIES[country];
 
   return (
     <form onSubmit={action} className="grid gap-6 lg:grid-cols-[1fr_340px] lg:items-start">
@@ -176,6 +182,33 @@ export function SettingsForm({ values }: { values: SettingsValues }) {
             ))}
           </fieldset>
           <p className="mt-2 text-xs text-muted">No hace falta tocar los productos: si un día separan la barra, se cambia acá y listo.</p>
+        </Section>
+
+        <Section title="País y moneda" description="Define la moneda, la hora del local, los medios de pago en caja y los textos del ticket.">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="País" htmlFor="country" error={fe.country}>
+              <Select id="country" name="country" value={country} onChange={(e) => setCountry(e.target.value as CountryCode)}>
+                {Object.entries(COUNTRIES).map(([code, x]) => (
+                  <option key={code} value={code}>
+                    {x.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Zona horaria" htmlFor="timezone">
+              <Select id="timezone" name="timezone" key={country} defaultValue={c.timezones.some((t) => t.id === values.timezone) ? values.timezone : c.timezones[0].id}>
+                {c.timezones.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+          <p className="mt-3 text-xs text-muted">
+            Moneda: <strong>{c.currency}</strong> · Cobro en caja: {c.payments.length} medios · Ticket: “{c.taxNote}”.
+            {country !== values.country && " Ojo: cambiar el país no convierte los precios de la carta; revisalos después."}
+          </p>
         </Section>
 
         <Card className="space-y-3 p-4">
