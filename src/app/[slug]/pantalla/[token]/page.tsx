@@ -30,6 +30,7 @@ export default async function ScreenPage({ params, searchParams }: PageProps<"/[
       channel={wallChannel(ctx.tenant.id, wall.id)}
       overlay={modo === "overlay"}
       venue={ctx.tenant.name}
+      videoUrl={wall.videoUrl}
       event={wall.name}
       qr={qr}
       joinHost={joinUrl.replace(/^https?:\/\//, "").replace(/\/muro\/.*/, "")}

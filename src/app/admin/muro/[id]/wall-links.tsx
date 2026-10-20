@@ -2,7 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Check, Copy, ExternalLink, Layers, QrCode } from "lucide-react";
+import { Check, Clapperboard, Copy, ExternalLink, Layers, QrCode } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { FormError, FormSuccess, Input } from "@/components/ui/field";
+import { useFormAction } from "@/lib/use-form-action";
+import { setWallVideo } from "../actions";
 import { QrDialog } from "@/components/qr-dialog";
 import { Card } from "@/components/ui/card";
 
@@ -46,4 +50,32 @@ export function LiveRefresh({ ms = 8000 }: { ms?: number }) {
     return () => clearInterval(id);
   }, [router, ms]);
   return null;
+}
+
+/** Video o lista de YouTube que se reproduce detrás de los mensajes. */
+export function WallVideoForm({ wallId, videoUrl }: { wallId: string; videoUrl: string | null }) {
+  const [state, action, pending] = useFormAction(setWallVideo.bind(null, wallId), undefined);
+  return (
+    <Card className="p-4">
+      <form onSubmit={action} className="space-y-2">
+        <h2 className="flex items-center gap-2 font-semibold">
+          <Clapperboard className="size-4" aria-hidden /> Video de fondo (opcional)
+        </h2>
+        <p className="text-xs text-muted">
+          Pegá un video o una lista de YouTube: se reproduce en loop detrás de los mensajes, sin OBS. Arranca sin sonido; en la pantalla hay un
+          botón para activarlo.
+        </p>
+        <Input name="videoUrl" defaultValue={videoUrl ?? ""} placeholder="https://www.youtube.com/watch?v=… o …playlist?list=…" aria-label="Enlace de YouTube" />
+        <FormError message={state?.error} />
+        <FormSuccess message={state?.ok} />
+        <Button type="submit" variant="secondary" className="w-full" disabled={pending}>
+          {pending ? "Guardando…" : "Guardar video"}
+        </Button>
+        <p className="text-[11px] text-muted">
+          Algunos videos no se pueden reproducir fuera de YouTube (lo decide quien lo subió): si queda en negro, probá con otro. La
+          música en público la cubre el local (SADAIC / AADI-CAPIF, SGAE).
+        </p>
+      </form>
+    </Card>
+  );
 }

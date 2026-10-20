@@ -258,9 +258,14 @@ async function finish(tdb: TenantDb, sessionId: string, ids: string[]) {
       }
     }
     if (groupId) await tx.tableGroup.delete({ where: { id: groupId } });
-    // Muro: el chat de la mesa se cierra y se borra (quien venga después arranca de cero).
-    await tx.chatMessage.deleteMany({ where: { room: { sessionId } } });
-    await tx.chatRoom.updateMany({ where: { sessionId, closedAt: null }, data: { closedAt: new Date() } });
+    // Muro: el chat de la mesa, sus chats compartidos ("brindis") y la foto se cierran y se borran
+    // (quien venga después arranca de cero).
+    const rooms = (await tx.chatRoom.findMany({ where: { sessionId }, select: { id: true } })).map((r) => r.id);
+    if (rooms.length) {
+      const scope = { OR: [{ id: { in: rooms } }, { linkedRoomIds: { hasSome: rooms } }] };
+      await tx.chatMessage.deleteMany({ where: { room: scope } });
+      await tx.chatRoom.updateMany({ where: { ...scope, closedAt: null }, data: { closedAt: new Date(), photoData: null, photoBy: null, photoApprovals: [] } });
+    }
   });
 }
 

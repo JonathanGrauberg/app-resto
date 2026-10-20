@@ -4,7 +4,7 @@ import { MessageCircleOff } from "lucide-react";
 import { MenuThemeScript } from "@/components/menu/menu-theme-script";
 import { JoinGate } from "@/components/muro/join-gate";
 import { db } from "@/lib/db";
-import { muroTenant, roomGone } from "@/lib/muro/data";
+import { chatPageData, muroTenant, roomGone } from "@/lib/muro/data";
 import { readGuest } from "@/lib/muro/guest";
 import { chatChannel } from "@/lib/realtime/server";
 import { ChatView } from "./chat-view";
@@ -32,9 +32,12 @@ export default async function ChatPage({ params }: PageProps<"/[slug]/chat/[code
   }
 
   const guest = await readGuest();
-  const messages = guest
-    ? await db.chatMessage.findMany({ where: { roomId: room.id }, orderBy: { createdAt: "asc" }, take: 200 })
-    : [];
+  const [messages, extra] = guest
+    ? await Promise.all([
+        db.chatMessage.findMany({ where: { roomId: room.id }, orderBy: { createdAt: "asc" }, take: 200 }),
+        chatPageData(room, guest.key),
+      ])
+    : [[], null];
 
   return (
     <main className="mx-auto flex w-full max-w-xl flex-1 flex-col px-4 py-6">
@@ -42,10 +45,16 @@ export default async function ChatPage({ params }: PageProps<"/[slug]/chat/[code
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand">{ctx.tenant.name}</p>
       {!guest ? (
         <div className="mt-2">
-          <JoinGate slug={slug} title={room.name} subtitle="El chat de la mesa: para hablar entre todos sin pararse. Se borra cuando la mesa se va." />
+          <JoinGate slug={slug} title={room.name} subtitle={
+              room.linkedRoomIds.length
+                ? "Chat compartido entre dos mesas que se mandaron un brindis. Se borra cuando alguna se va."
+                : "El chat de la mesa: para hablar entre todos sin pararse. Se borra cuando la mesa se va."
+            }
+          />
         </div>
       ) : (
         <ChatView
+          extra={extra!}
           slug={slug}
           code={code}
           channel={chatChannel(ctx.tenant.id, room.id)}

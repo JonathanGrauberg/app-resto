@@ -10,7 +10,7 @@ import { ADMIN_ROLES } from "@/lib/auth/permissions";
 import { cn } from "@/lib/format";
 import { roomGone } from "@/lib/muro/data";
 import { getRegion } from "@/lib/region-server";
-import { blockChatAuthor, closeChatRoom, setChatMessageHidden } from "../../actions";
+import { blockChatAuthor, closeChatRoom, removeRoomPhoto, setChatMessageHidden } from "../../actions";
 import { LiveRefresh } from "../../[id]/wall-links";
 import { GroupQr } from "./group-qr";
 
@@ -52,6 +52,20 @@ export default async function ChatRoomAdminPage({ params }: PageProps<"/admin/mu
           )
         }
       />
+
+      {room.photoData && (
+        <Card className="mb-6 flex items-center gap-4 p-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={room.photoData} alt="Foto de la mesa" className="size-20 rounded-xl object-cover" />
+          <div className="flex-1 text-sm">
+            <p className="font-semibold">Foto de la mesa</p>
+            <p className="text-muted">{room.photoApprovals.length ? "Aprobada por la mesa: la ven las otras mesas." : "Esperando que la apruebe otra persona de la mesa."}</p>
+          </div>
+          <form action={removeRoomPhoto.bind(null, room.id)}>
+            <button className="rounded-xl border border-danger/40 px-3 py-2 text-sm text-danger hover:bg-danger-soft">Sacar foto</button>
+          </form>
+        </Card>
+      )}
 
       {reported.length > 0 && (
         <Card className="mb-6 border-danger/40 p-4">

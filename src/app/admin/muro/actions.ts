@@ -9,6 +9,7 @@ import { ADMIN_ROLES, CAN_MANAGE_TABLES } from "@/lib/auth/permissions";
 import { isValidDate, isValidTime, zonedToUtc } from "@/lib/booking";
 import { db } from "@/lib/db";
 import { newCode } from "@/lib/muro/data";
+import { isYoutubeUrl } from "@/lib/muro/youtube";
 import { chatChannel, notifyChannel, wallChannel } from "@/lib/realtime/server";
 import { getRegion } from "@/lib/region-server";
 import { tableLabelOf } from "@/lib/table-session";
@@ -144,9 +145,32 @@ export async function blockChatAuthor(messageId: string) {
 /** Cierra el grupo y borra sus mensajes (no queda nada guardado). */
 export async function closeChatRoom(id: string, back?: string) {
   const { tdb, tenant } = await floor();
-  await tdb.chatMessage.deleteMany({ where: { roomId: id } });
-  await tdb.chatRoom.update({ where: { id }, data: { closedAt: new Date() } });
+  // También los chats compartidos ("brindis") de este grupo, y la foto.
+  const scope = { OR: [{ id }, { linkedRoomIds: { has: id } }] };
+  await tdb.chatMessage.deleteMany({ where: { room: scope } });
+  await tdb.chatRoom.updateMany({ where: { ...scope, closedAt: null }, data: { closedAt: new Date(), photoData: null, photoBy: null, photoApprovals: [] } });
   await notifyChannel(chatChannel(tenant.id, id));
   refresh();
   if (back) redirect(back);
+}
+
+/** El local saca la foto de una mesa (por ejemplo, si no corresponde). */
+export async function removeRoomPhoto(id: string) {
+  const { tdb, tenant } = await floor();
+  await tdb.chatRoom.update({ where: { id }, data: { photoData: null, photoBy: null, photoApprovals: [] } });
+  await notifyChannel(chatChannel(tenant.id, id));
+  refresh();
+}
+
+/** Video o lista de YouTube de fondo en la pantalla del muro. Vacío = sin video. */
+export async function setWallVideo(id: string, _: ActionState, formData: FormData): Promise<ActionState> {
+  const { tdb, tenant } = await admin();
+  const url = String(formData.get("videoUrl") ?? "").trim();
+  if (url && !isYoutubeUrl(url)) {
+    return { error: "Pegá un enlace de YouTube (video, short o lista)", fieldErrors: { videoUrl: "Enlace no válido" } };
+  }
+  await tdb.wall.update({ where: { id }, data: { videoUrl: url || null } });
+  await notifyChannel(wallChannel(tenant.id, id));
+  refresh();
+  return success(url ? "Video de fondo guardado" : "Sin video de fondo");
 }

@@ -23,6 +23,7 @@ const TENANT_MODELS = new Set([
   "WallMessage",
   "ChatRoom",
   "ChatMessage",
+  "ChatInvite",
   "Event",
   "Notification",
   "Payment",

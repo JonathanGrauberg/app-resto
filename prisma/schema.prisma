@@ -53,6 +53,7 @@ model Tenant {
   wallMessages   WallMessage[]
   chatRooms      ChatRoom[]
   chatMessages   ChatMessage[]
+  chatInvites    ChatInvite[]
   events         Event[]
   notifications  Notification[]
   translations   Translation[]
@@ -787,6 +788,8 @@ model Wall {
   /// Enlace secreto de la pantalla (lo abre el local en la tele o el proyector).
   screenToken String         @unique
   moderation  WallModeration @default(AUTO)
+  /// Video o lista de YouTube de fondo en la pantalla (opcional).
+  videoUrl    String?
   /// Personas bloqueadas por el local en este muro (id de la cookie).
   blockedKeys String[]       @default([])
   createdAt   DateTime       @default(now())
@@ -815,20 +818,31 @@ model WallMessage {
  * Grupo de chat de una mesa (lo arma el mozo). Se cierra y se borra al cobrar la mesa.
  */
 model ChatRoom {
-  id          String    @id @default(cuid())
-  tenantId    String
-  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  name        String
+  id             String    @id @default(cuid())
+  tenantId       String
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name           String
   /// Código del QR del grupo (público).
-  code        String    @unique
+  code           String    @unique
   /// Mesa a la que pertenece (se cierra con ella). Null = grupo suelto del local.
-  sessionId   String?
-  tableLabel  String?
-  blockedKeys String[]  @default([])
-  closedAt    DateTime?
-  createdAt   DateTime  @default(now())
+  sessionId      String?
+  tableLabel     String?
+  blockedKeys    String[]  @default([])
+  /// Quienes entraron al chat (id de la cookie): para aprobar la foto y contar participantes.
+  memberKeys     String[]  @default([])
+  /// Chat compartido entre mesas ("brindis" aceptado): ids de los grupos que lo forman.
+  linkedRoomIds  String[]  @default([])
+  /// Foto de la mesa (selfie sacada en el momento, JPEG chico como data URL). Se borra al cerrar.
+  photoData      String?
+  photoBy        String?
+  /// Quienes aprobaron la foto (además de quien la sacó). Con una aprobación queda visible.
+  photoApprovals String[]  @default([])
+  closedAt       DateTime?
+  createdAt      DateTime  @default(now())
 
-  messages ChatMessage[]
+  messages    ChatMessage[]
+  invitesSent ChatInvite[]  @relation("InviteFrom")
+  invitesGot  ChatInvite[]  @relation("InviteTo")
 
   @@index([tenantId, closedAt])
   @@index([sessionId])
@@ -849,4 +863,31 @@ model ChatMessage {
   createdAt  DateTime @default(now())
 
   @@index([roomId, createdAt])
+}
+
+enum ChatInviteStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+/**
+ * "Brindis": un grupo invita a otro a un chat compartido. Vence a los 15 minutos.
+ */
+model ChatInvite {
+  id          String           @id @default(cuid())
+  tenantId    String
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fromRoomId  String
+  fromRoom    ChatRoom         @relation("InviteFrom", fields: [fromRoomId], references: [id], onDelete: Cascade)
+  toRoomId    String
+  toRoom      ChatRoom         @relation("InviteTo", fields: [toRoomId], references: [id], onDelete: Cascade)
+  status      ChatInviteStatus @default(PENDING)
+  /// Chat compartido creado al aceptar.
+  jointRoomId String?
+  createdAt   DateTime         @default(now())
+  respondedAt DateTime?
+
+  @@index([toRoomId, status])
+  @@index([fromRoomId, status])
 }

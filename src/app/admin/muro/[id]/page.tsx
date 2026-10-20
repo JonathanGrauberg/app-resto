@@ -10,7 +10,7 @@ import { baseUrl } from "@/lib/base-url";
 import { cn } from "@/lib/format";
 import { getRegion } from "@/lib/region-server";
 import { blockWallAuthor, deleteWall, setWallMessage, setWallModeration } from "../actions";
-import { LiveRefresh, WallLinks } from "./wall-links";
+import { LiveRefresh, WallLinks, WallVideoForm } from "./wall-links";
 import { ActionButton } from "@/components/ui/action-button";
 
 export const metadata: Metadata = { title: "Muro" };
@@ -81,6 +81,7 @@ export default async function WallAdminPage({ params }: PageProps<"/admin/muro/[
             joinPath={`/${tenant.slug}/muro/${wall.code}`}
             screenUrl={`${base}/${tenant.slug}/pantalla/${wall.screenToken}`}
           />
+          <WallVideoForm wallId={wall.id} videoUrl={wall.videoUrl} />
           <Card className="p-4">
             <h2 className="mb-2 font-semibold">Moderación</h2>
             <div className="grid grid-cols-2 gap-2">
