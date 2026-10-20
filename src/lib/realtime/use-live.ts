@@ -69,10 +69,14 @@ export function useLive({
         // Al reconectar, refrescar por si se perdió algún aviso mientras estaba caído.
         if (change.current === "connected" && change.previous && change.previous !== "initialized") router.refresh();
       });
-      await client.channels.get(channel).subscribe("evt", (msg) => {
-        onEventRef.current?.((msg.data ?? {}) as Record<string, unknown>);
-        router.refresh();
-      });
+      // Al salir de la pantalla se cierra la conexión y la suscripción pendiente se rechaza: no es un error.
+      await client.channels
+        .get(channel)
+        .subscribe("evt", (msg) => {
+          onEventRef.current?.((msg.data ?? {}) as Record<string, unknown>);
+          router.refresh();
+        })
+        .catch(() => {});
     })();
 
     return () => {

@@ -885,6 +885,8 @@ model ChatInvite {
   status      ChatInviteStatus @default(PENDING)
   /// Chat compartido creado al aceptar.
   jointRoomId String?
+  /// La otra mesa no tenía el chat abierto: el aviso va a su mozo, que les pregunta en persona.
+  viaWaiter   Boolean          @default(false)
   createdAt   DateTime         @default(now())
   respondedAt DateTime?
 

@@ -5,6 +5,7 @@ import { MenuThemeScript } from "@/components/menu/menu-theme-script";
 import { JoinGate } from "@/components/muro/join-gate";
 import { db } from "@/lib/db";
 import { chatPageData, muroTenant, roomGone } from "@/lib/muro/data";
+import { readDiner } from "@/lib/diner";
 import { readGuest } from "@/lib/muro/guest";
 import { chatChannel } from "@/lib/realtime/server";
 import { ChatView } from "./chat-view";
@@ -12,8 +13,10 @@ import { ChatView } from "./chat-view";
 export const metadata: Metadata = { title: "Chat de la mesa", robots: { index: false } };
 
 /** Chat de una mesa o grupo (se entra por el QR que arma el mozo). */
-export default async function ChatPage({ params }: PageProps<"/[slug]/chat/[code]">) {
+export default async function ChatPage({ params, searchParams }: PageProps<"/[slug]/chat/[code]">) {
   const { slug, code } = await params;
+  // Embebido en la carta de la mesa (ventana sobre la carta): sin encabezado del local.
+  const embed = (await searchParams).embed === "1";
   const ctx = await muroTenant(slug);
   if (!ctx) notFound();
   const room = await db.chatRoom.findFirst({ where: { code, tenantId: ctx.tenant.id } });
@@ -40,12 +43,17 @@ export default async function ChatPage({ params }: PageProps<"/[slug]/chat/[code
     : [[], null];
 
   return (
-    <main className="mx-auto flex w-full max-w-xl flex-1 flex-col px-4 py-6">
+    <main className={embed ? "mx-auto flex w-full max-w-xl flex-1 flex-col px-4 py-3" : "mx-auto flex w-full max-w-xl flex-1 flex-col px-4 py-6"}>
       {theme}
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand">{ctx.tenant.name}</p>
+      {!embed && <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand">{ctx.tenant.name}</p>}
       {!guest ? (
         <div className="mt-2">
-          <JoinGate slug={slug} title={room.name} subtitle={
+          <JoinGate
+            slug={slug}
+            title={room.name}
+            kind={room.linkedRoomIds.length ? "joint" : "table"}
+            defaultName={(await readDiner(ctx.tenant.id))?.nickname ?? ""}
+            subtitle={
               room.linkedRoomIds.length
                 ? "Chat compartido entre dos mesas que se mandaron un brindis. Se borra cuando alguna se va."
                 : "El chat de la mesa: para hablar entre todos sin pararse. Se borra cuando la mesa se va."
@@ -54,6 +62,7 @@ export default async function ChatPage({ params }: PageProps<"/[slug]/chat/[code
         </div>
       ) : (
         <ChatView
+          embed={embed}
           extra={extra!}
           slug={slug}
           code={code}

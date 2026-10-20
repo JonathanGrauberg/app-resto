@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Camera, Check, Flag, MessagesSquare, Send, Users, X } from "lucide-react";
+import { Camera, Check, Flag, Send, Users, X } from "lucide-react";
 import { cn } from "@/lib/format";
 import type { ChatPageData } from "@/lib/muro/data";
 import { useLive } from "@/lib/realtime/use-live";
@@ -22,6 +22,7 @@ export function ChatView({
   blocked,
   messages,
   extra,
+  embed = false,
 }: {
   slug: string;
   code: string;
@@ -32,7 +33,10 @@ export function ChatView({
   blocked: boolean;
   messages: Msg[];
   extra: ChatPageData;
+  /** Abierto en la ventana sobre la carta de la mesa: los enlaces siguen dentro de la ventana. */
+  embed?: boolean;
 }) {
+  const chatHref = (c: string) => `/${slug}/chat/${c}${embed ? "?embed=1" : ""}`;
   const router = useRouter();
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -75,6 +79,26 @@ export function ChatView({
 
   return (
     <div className="flex flex-1 flex-col">
+      {/* Pestañas: chat de la mesa y un chat por cada brindis aceptado */}
+      {extra.tabs.length > 1 && (
+        <nav className="-mx-4 mb-3 flex gap-1.5 overflow-x-auto px-4 pb-1" aria-label="Chats">
+          {extra.tabs.map((t) => (
+            <Link
+              key={t.code}
+              href={chatHref(t.code)}
+              aria-current={t.active ? "page" : undefined}
+              className={cn(
+                "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold transition-colors",
+                t.active ? "bg-ink text-bg" : "bg-surface text-muted ring-1 ring-line hover:text-ink",
+              )}
+            >
+              {t.kind === "brindis" && <span aria-hidden>🍻</span>}
+              {t.label}
+            </Link>
+          ))}
+        </nav>
+      )}
+
       {/* Encabezado */}
       <header className="mb-3 flex items-center gap-3">
         {extra.isJoint ? (
@@ -87,7 +111,7 @@ export function ChatView({
           <Avatar photo={photo?.approved || photo?.mine ? photo.data : null} label={name} />
         )}
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-2xl font-black tracking-tight">{name}</h1>
+          <h1 className="truncate text-2xl font-black tracking-tight">{extra.title || name}</h1>
           <p className="text-sm text-muted">
             {tableLabel ? `Mesa ${tableLabel} · ` : ""}Estás como <strong className="text-ink">{me}</strong> ·{" "}
             <span className="inline-flex items-center gap-1">
@@ -105,6 +129,12 @@ export function ChatView({
         )}
       </header>
 
+      {extra.isJoint && (
+        <p className="mb-3 rounded-xl bg-ink/5 px-3 py-2 text-xs text-muted">
+          Chat entre mesas: el local puede revisar los mensajes y bloquear a quien no respete las reglas. Se borra cuando alguna mesa se va.
+        </p>
+      )}
+
       {/* Brindis recibidos */}
       {extra.incoming.map((i) => (
         <div key={i.id} className="mb-3 animate-fade-up rounded-2xl border border-brand bg-brand-soft p-3">
@@ -120,7 +150,7 @@ export function ChatView({
               No, gracias
             </button>
             <button
-              onClick={() => run(() => answerBrindis(slug, code, i.id, true), (r) => r.jointCode && router.push(`/${slug}/chat/${r.jointCode}`))}
+              onClick={() => run(() => answerBrindis(slug, code, i.id, true), (r) => r.jointCode && router.push(chatHref(r.jointCode)))}
               disabled={pending}
               className="flex-1 rounded-full bg-brand py-2 text-sm font-semibold text-brand-ink"
             >
@@ -172,7 +202,7 @@ export function ChatView({
         <div className="mb-3 rounded-2xl border border-line bg-surface p-3">
           <p className="mb-2 text-sm font-semibold">¿A qué mesa le mandan un brindis?</p>
           {extra.candidates.length === 0 ? (
-            <p className="text-sm text-muted">Por ahora no hay otras mesas con el chat abierto.</p>
+            <p className="text-sm text-muted">Por ahora no hay otras mesas ocupadas.</p>
           ) : (
             <ul className="space-y-1.5">
               {extra.candidates.map((c) => (
@@ -181,7 +211,9 @@ export function ChatView({
                   <span className="flex-1 text-sm">
                     <strong>{c.label}</strong>
                     <span className="block text-xs text-muted">
-                      {c.people} {c.people === 1 ? "persona" : "personas"} en el chat
+                      {c.viaWaiter
+                        ? "No tienen el chat abierto: le avisamos a su mozo para que les pregunte"
+                        : `${c.people} ${c.people === 1 ? "persona" : "personas"} en el chat`}
                     </span>
                   </span>
                   <button
@@ -195,18 +227,13 @@ export function ChatView({
               ))}
             </ul>
           )}
-          <p className="mt-2 text-xs text-muted">Si aceptan, se abre un chat entre las dos mesas. Si dicen que no, no se les vuelve a insistir.</p>
+          <p className="mt-2 text-xs text-muted">Si aceptan, se abre un chat entre las dos mesas. Si dicen que no, no se les vuelve a insistir. Máximo 6 brindis por noche.</p>
         </div>
       )}
 
-      {/* Chats con otras mesas y brindis esperando */}
-      {(extra.joints.length > 0 || extra.outgoing.length > 0) && (
+      {/* Brindis esperando respuesta (los aceptados ya están en las pestañas) */}
+      {extra.outgoing.length > 0 && (
         <div className="mb-3 flex flex-wrap gap-2">
-          {extra.joints.map((j) => (
-            <Link key={j.code} href={`/${slug}/chat/${j.code}`} className="inline-flex items-center gap-1.5 rounded-full bg-ok-soft px-3 py-1.5 text-sm font-medium text-ok">
-              <MessagesSquare className="size-4" aria-hidden /> {j.name}
-            </Link>
-          ))}
           {extra.outgoing.map((o) => (
             <span key={o.id} className="rounded-full bg-ink/5 px-3 py-1.5 text-xs text-muted">
               Brindis a {o.label}: esperando…

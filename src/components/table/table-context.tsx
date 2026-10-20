@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 import type { DinerTableState } from "@/lib/table-session";
 import { useLive } from "@/lib/realtime/use-live";
-import { addToCart, callWaiter, joinTable, submitOrder, updateCartItem } from "@/app/[slug]/m/[qrToken]/actions";
+import { addToCart, callWaiter, joinTable, openTableChat, submitOrder, updateCartItem } from "@/app/[slug]/m/[qrToken]/actions";
+import { ChatSheet } from "./chat-sheet";
 import { JoinDialog } from "./join-dialog";
 import { OrderSheet } from "./order-sheet";
 import { ReviewPrompt } from "./review-prompt";
@@ -23,6 +24,8 @@ export type TableInfo = {
   channel: string | null;
   reviewUrl: string | null;
   state: DinerTableState;
+  /** Muro activo: botón "Chat" en la barra (code: el chat de la mesa, si ya existe). */
+  chat: { code: string | null } | null;
 };
 
 type AddInput = { productId: string; quantity: number; optionIds: string[]; notes?: string };
@@ -36,6 +39,7 @@ type Ctx = {
   send: () => Promise<Result>;
   call: () => Promise<Result>;
   openOrder: () => void;
+  openChat: () => Promise<void>;
   toast: (msg: string) => void;
 };
 
@@ -52,6 +56,7 @@ export function TableProvider({ info, children }: { info: TableInfo; children: R
   const [orderOpen, setOrderOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [review, setReview] = useState(false);
+  const [chatCode, setChatCode] = useState<string | null>(null);
   const joinResolver = useRef<((joined: boolean) => void) | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -123,6 +128,13 @@ export function TableProvider({ info, children }: { info: TableInfo; children: R
         return res;
       },
       openOrder: () => setOrderOpen(true),
+      openChat: async () => {
+        if (!(await ensureJoined())) return;
+        const res = await openTableChat(info.slug, info.qrToken);
+        if (res.error || !res.code) return toast(res.error ?? "No se pudo abrir el chat");
+        setChatCode(res.code);
+        router.refresh();
+      },
       toast,
     }),
     [info, ensureJoined, router, toast],
@@ -133,6 +145,7 @@ export function TableProvider({ info, children }: { info: TableInfo; children: R
       {children}
       <TableBar />
       {orderOpen && <OrderSheet onClose={() => setOrderOpen(false)} />}
+      {chatCode && <ChatSheet src={`/${info.slug}/chat/${chatCode}?embed=1`} onClose={() => setChatCode(null)} />}
       {joinOpen && (
         <JoinDialog
           tableLabel={info.label}

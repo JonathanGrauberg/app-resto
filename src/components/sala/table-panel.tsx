@@ -30,7 +30,7 @@ import { STATUS_STYLE } from "@/components/table-map";
 import { cn } from "@/lib/format";
 import type { SalaReservation, SalaSession, SalaTable } from "@/lib/sala";
 import { seatReservation } from "@/app/admin/reservas/actions";
-import { createChatGroup } from "@/app/admin/muro/actions";
+import { answerBrindisForTable, createChatGroup } from "@/app/admin/muro/actions";
 import {
   addExtraTable,
   assignWaiter,
@@ -52,6 +52,7 @@ export function TablePanel({
   members,
   session,
   reservation,
+  brindis = [],
   timezone,
   areaName,
   areaId,
@@ -70,6 +71,8 @@ export function TablePanel({
   session: SalaSession | null;
   /** Próxima reserva de la mesa (esperando que lleguen). */
   reservation: SalaReservation | null;
+  /** Brindis de otras mesas esperando que el mozo les pregunte (la mesa no tiene el chat abierto). */
+  brindis?: { id: string; fromLabel: string }[];
   timezone: string;
   areaName: string;
   areaId: string;
@@ -91,6 +94,7 @@ export function TablePanel({
   const [chatName, setChatName] = useState<string | null>(null);
   const [extraSeats, setExtraSeats] = useState<number | null>(null);
   const [composing, setComposing] = useState(false);
+  const [askWaiter, setAskWaiter] = useState(false);
   const [paying, setPaying] = useState(false);
   // Nombres que ya pidieron en la mesa, para cargar "para quién" con un toque.
   const knownNames = [
@@ -135,6 +139,36 @@ export function TablePanel({
           )}
         </p>
       </div>
+
+      {brindis.map((b) => (
+        <section key={b.id} className="rounded-xl border border-brand bg-brand-soft p-3 text-sm">
+          <p className="font-semibold">🍻 La {b.fromLabel} los invita a un chat</p>
+          <p className="mt-0.5 text-muted">Preguntales en persona si quieren sumarse. Si no, no se les vuelve a insistir.</p>
+          <div className="mt-2 flex gap-2">
+            <button
+              onClick={() => run(() => answerBrindisForTable(b.id, false))}
+              disabled={pending}
+              className="flex-1 rounded-lg border border-line bg-surface py-2 text-sm hover:bg-ink/5"
+            >
+              No quieren
+            </button>
+            <button
+              onClick={() =>
+                start(async () => {
+                  const res = await answerBrindisForTable(b.id, true);
+                  setMsg(res ?? null);
+                  if (res?.code) setChat({ code: res.code, name: title });
+                  onDone();
+                })
+              }
+              disabled={pending}
+              className="flex-1 rounded-lg bg-brand py-2 text-sm font-semibold text-brand-ink"
+            >
+              Aceptaron · mostrar QR
+            </button>
+          </div>
+        </section>
+      ))}
 
       {reservation && (
         <section
@@ -277,13 +311,57 @@ export function TablePanel({
           )}
 
           {/* Tomar pedido (mesa sin celular) */}
-          {session?.status === "OPEN" && (
+          {session?.status === "OPEN" && !askWaiter && (
             <button
-              onClick={() => setComposing(true)}
+              onClick={() =>
+                // Admin / caja tomando el pedido de una mesa sin mozo: antes, ofrecer asignársela a alguien.
+                !session.waiterId && !me.roles.includes("MOZO") && waiters.length > 0 ? setAskWaiter(true) : setComposing(true)
+              }
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3 font-semibold text-brand-ink"
             >
               <NotebookPen className="size-5" aria-hidden /> Tomar pedido
             </button>
+          )}
+          {session && askWaiter && (
+            <section className="space-y-2 rounded-xl border border-brand/40 bg-brand-soft/40 p-3">
+              <p className="text-sm font-medium">Esta mesa no tiene mozo. ¿Se la asignás a alguien antes de tomar el pedido?</p>
+              <div className="flex flex-wrap gap-2">
+                {waiters.map((w) => (
+                  <button
+                    key={w.id}
+                    onClick={() =>
+                      start(async () => {
+                        const res = await assignWaiter(session.id, w.id);
+                        setMsg(res ?? null);
+                        setAskWaiter(false);
+                        if (!res?.error) {
+                          setComposing(true);
+                          onDone();
+                        }
+                      })
+                    }
+                    disabled={pending}
+                    className="rounded-lg border border-line bg-surface px-3 py-2 text-sm font-medium hover:border-brand"
+                  >
+                    {w.name}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setAskWaiter(false)} className="flex-1 rounded-lg py-2 text-sm hover:bg-ink/5">
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    setAskWaiter(false);
+                    setComposing(true);
+                  }}
+                  className="flex-1 rounded-lg border border-line py-2 text-sm hover:bg-ink/5"
+                >
+                  Seguir sin mozo
+                </button>
+              </div>
+            </section>
           )}
 
           {/* Pedidos */}

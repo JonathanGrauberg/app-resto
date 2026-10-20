@@ -481,6 +481,7 @@ export function SalaView({
                 members={groupMembers(allTables, selected)}
                 session={sessionFor(data.sessions, groupMembers(allTables, selected))}
                 reservation={reservationFor(data.reservations, groupMembers(allTables, selected))}
+                brindis={data.brindis.filter((b) => b.sessionId === sessionFor(data.sessions, groupMembers(allTables, selected))?.id)}
                 timezone={data.timezone}
                 areaName={data.areas.find((a) => a.tables.some((t) => t.id === selected.id))?.name ?? ""}
                 waiters={data.waiters}

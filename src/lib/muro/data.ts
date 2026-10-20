@@ -57,6 +57,7 @@ export function tooFast(recent: Date[], now = Date.now()) {
 
 type Room = {
   id: string;
+  code: string;
   name: string;
   tableLabel: string | null;
   linkedRoomIds: string[];
@@ -72,8 +73,32 @@ type Room = {
 };
 
 const roomLabel = (r: { tableLabel: string | null; name: string }) => (r.tableLabel ? `Mesa ${r.tableLabel}` : r.name);
-/** La foto se muestra a otras mesas solo si otra persona de la mesa la aprobó. */
-const approvedPhoto = (r: Room) => (r.photoData && r.photoApprovals.length > 0 ? r.photoData : null);
+/**
+ * La foto vale si otra persona de la mesa la aprobó, o si quien la sacó está solo en el chat
+ * (no hay a quién pedirle). Si después se suma alguien, a esa persona se le pide aprobarla.
+ */
+export const photoOk = (r: Pick<Room, "photoData" | "photoApprovals" | "memberKeys" | "photoBy">) =>
+  !!r.photoData && (r.photoApprovals.length > 0 || r.memberKeys.every((k) => k === r.photoBy));
+const approvedPhoto = (r: Room) => (photoOk(r) ? r.photoData : null);
+
+/**
+ * Pestañas de arriba: el chat de la mesa y uno por cada brindis aceptado ("🍻 Mesa 7").
+ * Se ven igual desde cualquiera de las dos mesas.
+ */
+async function chatTabs(own: Room, activeId: string, now: number) {
+  const joints = (await db.chatRoom.findMany({ where: { closedAt: null, linkedRoomIds: { has: own.id } }, orderBy: { createdAt: "asc" } })).filter(
+    (j) => !roomGone(j, now),
+  );
+  const otherIds = joints.flatMap((j) => j.linkedRoomIds).filter((id) => id !== own.id);
+  const others = otherIds.length ? await db.chatRoom.findMany({ where: { id: { in: otherIds } } }) : [];
+  return [
+    { code: own.code, label: own.name, kind: "mesa" as const, active: own.id === activeId, photo: approvedPhoto(own) },
+    ...joints.map((j) => {
+      const other = others.find((o) => o.id !== own.id && j.linkedRoomIds.includes(o.id));
+      return { code: j.code, label: other ? roomLabel(other) : j.name, kind: "brindis" as const, active: j.id === activeId, photo: other ? approvedPhoto(other) : null };
+    }),
+  ];
+}
 
 /**
  * Todo lo que ve una persona en el chat de su mesa: la registra como participante,
@@ -85,13 +110,19 @@ export async function chatPageData(room: Room, guestKey: string) {
     room = { ...room, memberKeys: [...room.memberKeys, guestKey] };
   }
   const now = Date.now();
-  const since = new Date(now - 15 * 60_000);
+  const since = new Date(now - 30 * 60_000);
   const isJoint = room.linkedRoomIds.length > 0;
 
   if (isJoint) {
     const sides = await db.chatRoom.findMany({ where: { id: { in: room.linkedRoomIds } } });
+    // Su mesa es el lado donde participa (para armar las mismas pestañas que ve en su chat).
+    const own = sides.find((r) => r.memberKeys.includes(guestKey)) ?? sides[0];
+    const other = sides.find((r) => r.id !== own?.id);
     return {
       isJoint,
+      /** Visto desde cada mesa: "Chat con Mesa 7". */
+      title: other ? `Chat con ${roomLabel(other)}` : room.name,
+      tabs: own ? await chatTabs(own, room.id, now) : [],
       members: room.memberKeys.length,
       sides: sides.map((r) => ({ label: roomLabel(r), photo: approvedPhoto(r) })),
       incoming: [],
@@ -109,6 +140,11 @@ export async function chatPageData(room: Room, guestKey: string) {
     db.chatRoom.findMany({ where: { closedAt: null, linkedRoomIds: { has: room.id } }, orderBy: { createdAt: "desc" } }),
     db.chatRoom.findMany({ where: { tenantId: room.tenantId, closedAt: null, linkedRoomIds: { isEmpty: true }, id: { not: room.id } } }),
   ]);
+  // Mesas ocupadas sin chat (o con el chat vacío): el brindis va a su mozo.
+  const occupied = await db.tableSession.findMany({
+    where: { tenantId: room.tenantId, status: "OPEN", ...(room.sessionId ? { id: { not: room.sessionId } } : {}) },
+    include: { table: { select: { number: true, groupId: true } } },
+  });
   const liveJoints = joints.filter((j) => !roomGone(j, now));
   const busy = new Set([
     ...liveJoints.flatMap((j) => j.linkedRoomIds),
@@ -119,6 +155,8 @@ export async function chatPageData(room: Room, guestKey: string) {
 
   return {
     isJoint,
+    title: room.name,
+    tabs: liveJoints.length ? await chatTabs(room, room.id, now) : [],
     members: room.memberKeys.length,
     sides: [],
     incoming: incoming
@@ -126,14 +164,23 @@ export async function chatPageData(room: Room, guestKey: string) {
       .map((i) => ({ id: i.id, label: roomLabel(i.fromRoom), photo: approvedPhoto(i.fromRoom), people: i.fromRoom.memberKeys.length })),
     outgoing: outgoing.map((i) => ({ id: i.id, label: roomLabel(i.toRoom) })),
     joints: liveJoints.map((j) => ({ code: j.code, name: j.name })),
-    candidates: others
-      .filter((r) => !roomGone(r, now) && !busy.has(r.id) && r.memberKeys.length > 0)
-      .map((r) => ({ id: r.id, label: roomLabel(r), photo: approvedPhoto(r), people: r.memberKeys.length }))
-      .sort((a, b) => a.label.localeCompare(b.label, "es", { numeric: true })),
+    candidates: [
+      // Con gente en el chat: el aviso les aparece directo.
+      ...others
+        .filter((r) => !roomGone(r, now) && !busy.has(r.id) && r.memberKeys.length > 0)
+        .map((r) => ({ id: `sala:${r.id}`, label: roomLabel(r), photo: approvedPhoto(r), people: r.memberKeys.length, viaWaiter: false })),
+      // Sin chat abierto: le avisamos al mozo, que les pregunta.
+      ...occupied
+        .filter((s) => {
+          const r = others.find((o) => o.sessionId === s.id && !roomGone(o, now));
+          return !r || (r.memberKeys.length === 0 && !busy.has(r.id));
+        })
+        .map((s) => ({ id: `mesa:${s.id}`, label: `Mesa ${s.table.number}`, photo: null, people: s.guests, viaWaiter: true })),
+    ].sort((a, b) => a.label.localeCompare(b.label, "es", { numeric: true })),
     photo: room.photoData
       ? {
           data: room.photoData,
-          approved: room.photoApprovals.length > 0,
+          approved: photoOk(room),
           mine: room.photoBy === guestKey,
           voted: room.photoApprovals.includes(guestKey),
         }

@@ -76,11 +76,31 @@ export function findBlocked(text: string, country: CountryCode, extra: string[] 
   return null;
 }
 
-/** Reglas que se aceptan antes de escribir (también se muestran en el cartel). */
-export const MURO_RULES = [
+const COMMON_RULES = [
   "Nada de insultos, burlas ni discriminación.",
   "Nada de contenido sexual ni de doble sentido subido de tono.",
   "No compartas teléfonos, redes ni datos de nadie.",
-  "Las quejas o pedidos al local no van al muro: hablalo con el personal.",
-  "El local puede borrar mensajes y bloquear a quien no respete las reglas.",
 ];
+
+/**
+ * Reglas que se aceptan antes de escribir, según dónde:
+ * - wall: el muro del evento es público (pantalla del local): el local modera.
+ * - table: el chat de la propia mesa es privado; el local solo ve lo que alguien reporta.
+ * - joint: entre mesas que no se conocen, el local puede revisar y bloquear.
+ */
+export const RULES = {
+  wall: [
+    ...COMMON_RULES,
+    "Las quejas o pedidos al local no van al muro: hablalo con el personal.",
+    "El local puede borrar mensajes y bloquear a quien no respete las reglas.",
+  ],
+  table: [...COMMON_RULES, "Es el chat de tu mesa: lo ven solo ustedes y se borra cuando se van.", "Si reportás un mensaje, lo revisa el local."],
+  joint: [
+    ...COMMON_RULES,
+    "En los chats entre mesas, el local puede revisar los mensajes y bloquear a quien no respete las reglas.",
+  ],
+} as const;
+export type RulesKind = keyof typeof RULES;
+
+/** Compatibilidad: las reglas del muro. */
+export const MURO_RULES = RULES.wall;

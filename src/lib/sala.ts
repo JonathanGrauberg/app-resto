@@ -8,7 +8,7 @@ export async function getSalaData(tdb: TenantDb, tenantId: string) {
   const cfg = await getBookingConfig(tenantId);
   await expireReservations(tdb, cfg.graceMin);
   const now = Date.now();
-  const [areas, sessions, waiters, reservations, waitlist] = await Promise.all([
+  const [areas, sessions, waiters, reservations, waitlist, brindis] = await Promise.all([
     tdb.area.findMany({
       orderBy: { sortOrder: "asc" },
       include: { tables: { where: { archivedAt: null }, orderBy: { number: "asc" } } },
@@ -35,6 +35,12 @@ export async function getSalaData(tdb: TenantDb, tenantId: string) {
       include: { tables: { select: { tableId: true } } },
     }),
     tdb.waitlistEntry.findMany({ where: { status: "WAITING" }, orderBy: { createdAt: "asc" } }),
+    // Brindis a mesas sin chat: el mozo les pregunta en persona (vencen a los 30 min).
+    tdb.chatInvite.findMany({
+      where: { status: "PENDING", viaWaiter: true, createdAt: { gte: new Date(now - 30 * 60_000) }, toRoom: { closedAt: null, sessionId: { not: null } } },
+      include: { fromRoom: { select: { name: true, tableLabel: true } }, toRoom: { select: { sessionId: true } } },
+      orderBy: { createdAt: "asc" },
+    }),
   ]);
 
   return {
@@ -110,6 +116,11 @@ export async function getSalaData(tdb: TenantDb, tenantId: string) {
     timezone: cfg.timezone,
     /** Cuánto ocupa una reserva: para no sugerir una mesa que tiene una reserva enseguida. */
     bookingDurationMin: cfg.durationMin,
+    brindis: brindis.map((b) => ({
+      id: b.id,
+      sessionId: b.toRoom.sessionId!,
+      fromLabel: b.fromRoom.tableLabel ? `Mesa ${b.fromRoom.tableLabel}` : b.fromRoom.name,
+    })),
     waitlist: waitlist.map((w) => ({
       id: w.id,
       name: w.name,

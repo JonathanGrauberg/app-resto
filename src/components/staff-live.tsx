@@ -139,6 +139,13 @@ export function StaffLive({
       if (e.type === "waiter.called") {
         push({ kind: "call", title: `Mesa ${e.tableLabel} llama al mozo`, detail: waiterId ? "" : "La mesa no tiene mozo asignado" });
       }
+      if (e.type === "brindis.mesa") {
+        push({
+          kind: "booking",
+          title: `🍻 Brindis para la ${e.toLabel}`,
+          detail: `La ${e.fromLabel} los invita a un chat. Preguntales si quieren (está en el panel de la mesa).`,
+        });
+      }
       if (e.type === "kitchen.call") {
         push({
           kind: "kitchen",

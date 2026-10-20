@@ -8,7 +8,7 @@ import { Badge, Card } from "@/components/ui/card";
 import { requireTenantRole } from "@/lib/auth/guards";
 import { ADMIN_ROLES } from "@/lib/auth/permissions";
 import { cn } from "@/lib/format";
-import { roomGone } from "@/lib/muro/data";
+import { photoOk, roomGone } from "@/lib/muro/data";
 import { getRegion } from "@/lib/region-server";
 import { blockChatAuthor, closeChatRoom, removeRoomPhoto, setChatMessageHidden } from "../../actions";
 import { LiveRefresh } from "../../[id]/wall-links";
@@ -25,6 +25,8 @@ export default async function ChatRoomAdminPage({ params }: PageProps<"/admin/mu
   const region = await getRegion(tenant.id);
   const messages = await tdb.chatMessage.findMany({ where: { roomId: id }, orderBy: { createdAt: "desc" }, take: 300 });
   const reported = messages.filter((m) => m.reportedBy.length > 0);
+  // Chat de una mesa: es privado de la mesa; el local solo ve lo reportado. Entre mesas: ve todo.
+  const isPrivate = room.linkedRoomIds.length === 0;
   const gone = roomGone(room);
   const time = (d: Date) => d.toLocaleTimeString(region.locale, { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: region.timezone });
 
@@ -59,7 +61,7 @@ export default async function ChatRoomAdminPage({ params }: PageProps<"/admin/mu
           <img src={room.photoData} alt="Foto de la mesa" className="size-20 rounded-xl object-cover" />
           <div className="flex-1 text-sm">
             <p className="font-semibold">Foto de la mesa</p>
-            <p className="text-muted">{room.photoApprovals.length ? "Aprobada por la mesa: la ven las otras mesas." : "Esperando que la apruebe otra persona de la mesa."}</p>
+            <p className="text-muted">{photoOk(room) ? "Vigente: la ven las otras mesas." : "Esperando que la apruebe otra persona de la mesa."}</p>
           </div>
           <form action={removeRoomPhoto.bind(null, room.id)}>
             <button className="rounded-xl border border-danger/40 px-3 py-2 text-sm text-danger hover:bg-danger-soft">Sacar foto</button>
@@ -81,6 +83,12 @@ export default async function ChatRoomAdminPage({ params }: PageProps<"/admin/mu
         </Card>
       )}
 
+      {isPrivate ? (
+        <Card className="p-4 text-sm text-muted">
+          {messages.length} {messages.length === 1 ? "mensaje" : "mensajes"} en el chat de la mesa. Es privado de la mesa: acá solo se ven los
+          que alguien reporta.
+        </Card>
+      ) : (
       <Card className="p-4">
         <h2 className="mb-2 font-semibold">Mensajes ({messages.length})</h2>
         {messages.length === 0 ? (
@@ -93,6 +101,7 @@ export default async function ChatRoomAdminPage({ params }: PageProps<"/admin/mu
           </ul>
         )}
       </Card>
+      )}
     </>
   );
 }

@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { BellRing, ReceiptText, ShoppingBag } from "lucide-react";
+import { BellRing, MessagesSquare, ReceiptText, ShoppingBag } from "lucide-react";
 import { useTable } from "./table-context";
 
 /** Barra fija de la mesa: quién soy, llamar al mozo y ver el pedido compartido. */
 export function TableBar() {
   const t = useTable()!;
   const [calling, setCalling] = useState(false);
+  const [opening, setOpening] = useState(false);
   const { info } = t;
   const inCart = info.state.cart.reduce((n, i) => n + i.quantity, 0);
   const sent = info.state.orders.filter((o) => o.status !== "REJECTED").length;
@@ -47,6 +48,24 @@ export function TableBar() {
             >
               <BellRing className="size-4" aria-hidden /> <span className="hidden sm:inline">Llamar</span> mozo
             </button>
+            {info.chat && (
+              <button
+                onClick={async () => {
+                  setOpening(true);
+                  await t.openChat();
+                  setOpening(false);
+                }}
+                disabled={opening}
+                aria-label="Chat de la mesa"
+                className={
+                  info.chat.code
+                    ? "flex h-12 items-center gap-2 rounded-full bg-brand-soft px-4 text-sm font-semibold text-brand ring-1 ring-brand/40 disabled:opacity-50"
+                    : "flex h-12 items-center gap-2 rounded-full border border-line px-4 text-sm font-medium disabled:opacity-50"
+                }
+              >
+                <MessagesSquare className="size-4" aria-hidden /> <span className="hidden sm:inline">Chat</span>
+              </button>
+            )}
             <button
               onClick={t.openOrder}
               className="relative flex h-12 items-center gap-2 rounded-full bg-ink px-5 text-sm font-semibold text-bg"

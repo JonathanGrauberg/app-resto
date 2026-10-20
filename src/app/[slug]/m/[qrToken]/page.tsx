@@ -6,7 +6,9 @@ import { MenuExperience } from "@/components/menu/menu-experience";
 import { MenuThemeScript } from "@/components/menu/menu-theme-script";
 import { getPublicMenu, getPublicTenant, toVenue } from "@/lib/public-menu";
 import { readDiner } from "@/lib/diner";
+import { hasModule } from "@/lib/modules";
 import { tableChannel } from "@/lib/realtime/server";
+import { tenantDb } from "@/lib/tenant-db";
 import { paidReceiptPath } from "@/lib/receipt";
 import { currentDiner, dinerTableState, tableContext } from "@/lib/table-session";
 
@@ -35,6 +37,17 @@ export default async function TableEntryPage({ params }: PageProps<"/[slug]/m/[q
   const [menu, diner] = await Promise.all([getPublicMenu(tenant.id), currentDiner(ctx)]);
   const state = diner ? await dinerTableState(ctx) : { cart: [], orders: [] };
   const sessionStatus = !ctx.session ? "NONE" : ctx.session.status === "PENDING_PAYMENT" ? "PENDING_PAYMENT" : "OPEN";
+  // Muro: botón "Chat" en la barra; si la mesa ya tiene su chat, se muestra destacado.
+  const chat = (await hasModule(tenant.id, "MURO"))
+    ? {
+        code: ctx.session
+          ? ((await tenantDb(tenant.id).chatRoom.findFirst({
+              where: { sessionId: ctx.session.id, closedAt: null, linkedRoomIds: { isEmpty: true } },
+              select: { code: true },
+            }))?.code ?? null)
+          : null,
+      }
+    : null;
   const receiptUrl = ctx.session?.receiptToken ? `/${tenant.slug}/cuenta/${ctx.session.receiptToken}` : null;
 
   // ¿Este celular estuvo en una mesa que ya pagó? Se le ofrece su cuenta mientras siga vigente (24 h).
@@ -59,6 +72,7 @@ export default async function TableEntryPage({ params }: PageProps<"/[slug]/m/[q
           channel: diner && ctx.session ? tableChannel(tenant.id, ctx.session.id) : null,
           reviewUrl: tenant.settings?.googleReviewUrl ?? null,
           state,
+          chat,
         }}
         notice={
           <>

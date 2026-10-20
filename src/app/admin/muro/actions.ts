@@ -174,3 +174,29 @@ export async function setWallVideo(id: string, _: ActionState, formData: FormDat
   refresh();
   return success(url ? "Video de fondo guardado" : "Sin video de fondo");
 }
+
+/**
+ * Brindis a una mesa sin chat: el mozo les preguntó en persona y marca la respuesta.
+ * Si aceptaron, se arma el chat compartido y devuelve el código del chat de la mesa (para mostrarles el QR).
+ */
+export async function answerBrindisForTable(inviteId: string, accept: boolean): Promise<ActionState & { code?: string }> {
+  const { tdb, tenant } = await floor();
+  const invite = await tdb.chatInvite.findUnique({ where: { id: inviteId }, include: { fromRoom: true, toRoom: true } });
+  if (!invite || invite.status !== "PENDING") return { error: "Ese brindis ya se respondió o venció" };
+  if (invite.fromRoom.closedAt || invite.toRoom.closedAt) return { error: "Una de las mesas ya cerró su chat" };
+  if (!accept) {
+    await tdb.chatInvite.update({ where: { id: inviteId }, data: { status: "REJECTED", respondedAt: new Date() } });
+  } else {
+    const label = (r: { tableLabel: string | null; name: string }) => (r.tableLabel ? `Mesa ${r.tableLabel}` : r.name);
+    const joint = await tdb.chatRoom.create({
+      data: { tenantId: tenant.id, name: `${label(invite.fromRoom)} 🍻 ${label(invite.toRoom)}`, code: newCode(), linkedRoomIds: [invite.fromRoomId, invite.toRoomId] },
+    });
+    await tdb.chatInvite.update({ where: { id: inviteId }, data: { status: "ACCEPTED", respondedAt: new Date(), jointRoomId: joint.id } });
+  }
+  await notifyChannel(chatChannel(tenant.id, invite.fromRoomId));
+  await notifyChannel(chatChannel(tenant.id, invite.toRoomId));
+  refresh();
+  return accept
+    ? { ok: "¡Brindis aceptado! Mostrales el QR o que toquen Chat en la carta.", at: Date.now(), code: invite.toRoom.code }
+    : { ok: "Listo, no se les vuelve a insistir.", at: Date.now() };
+}

@@ -5,6 +5,8 @@ import { db } from "@/lib/db";
 import { readGuest, saveGuest } from "@/lib/muro/guest";
 import { ROOM_TTL_MS, checkText, muroTenant, newCode, tooFast, wallOpen } from "@/lib/muro/data";
 import { findBlocked } from "@/lib/muro/filter";
+import { tableLabelOf } from "@/lib/table-session";
+import { tenantDb } from "@/lib/tenant-db";
 import { chatChannel, notifyChannel, notifyStaff, wallChannel } from "@/lib/realtime/server";
 
 type Result = { ok?: string; error?: string };
@@ -112,7 +114,10 @@ export async function reportChatMessage(slug: string, code: string, messageId: s
 // Brindis: invitar a otra mesa a un chat compartido
 // ─────────────────────────────────────────────────────────────
 
-const INVITE_TTL_MS = 15 * 60_000;
+/** Un brindis vence a los 30 minutos (si va por el mozo, le da tiempo a preguntar). */
+const INVITE_TTL_MS = 30 * 60_000;
+/** Brindis que puede mandar una mesa en toda la noche. */
+const MAX_BRINDIS = 6;
 const label = (r: { tableLabel: string | null; name: string }) => (r.tableLabel ? `Mesa ${r.tableLabel}` : r.name);
 
 /** Grupo abierto + quien escribe, que tiene que haber entrado al grupo (no alcanza con tener el código). */
@@ -132,32 +137,89 @@ async function refreshRooms(slug: string, tenantId: string, rooms: { id: string;
   }
 }
 
-export async function sendBrindis(slug: string, code: string, toRoomId: string): Promise<Result> {
+/**
+ * Mandar un brindis. `target`:
+ * - "sala:<id>" → un chat de otra mesa con gente adentro: el aviso les aparece en el chat.
+ * - "mesa:<sessionId>" → una mesa ocupada sin chat: el aviso va a SU MOZO, que les pregunta en persona
+ *   (nadie recibe invitaciones de la nada en el celular).
+ */
+export async function sendBrindis(slug: string, code: string, target: string): Promise<Result> {
   const m = await memberContext(slug, code);
   if (!m) return { error: "Entrá al chat de tu mesa para mandar un brindis" };
   const { ctx, room } = m;
   if (room.linkedRoomIds.length) return { error: "Los brindis se mandan desde el chat de tu mesa" };
-  const target = await openRoom(ctx.tenant.id, (await db.chatRoom.findFirst({ where: { id: toRoomId, tenantId: ctx.tenant.id } }))?.code ?? "");
-  if (!target || target.id === room.id || target.linkedRoomIds.length) return { error: "Esa mesa no tiene el chat abierto" };
+
+  let to: Awaited<ReturnType<typeof openRoom>> = null;
+  let viaWaiter = false;
+  let waiterId: string | null = null;
+  if (target.startsWith("sala:")) {
+    const r = await db.chatRoom.findFirst({ where: { id: target.slice(5), tenantId: ctx.tenant.id } });
+    to = r ? await openRoom(ctx.tenant.id, r.code) : null;
+    if (!to || to.linkedRoomIds.length) return { error: "Esa mesa ya no tiene el chat abierto" };
+    viaWaiter = to.memberKeys.length === 0;
+    if (viaWaiter && to.sessionId) {
+      waiterId = (await db.tableSession.findUnique({ where: { id: to.sessionId }, select: { waiterId: true } }))?.waiterId ?? null;
+    }
+  } else if (target.startsWith("mesa:")) {
+    const session = await db.tableSession.findFirst({
+      where: { id: target.slice(5), tenantId: ctx.tenant.id, status: "OPEN" },
+      include: { table: true },
+    });
+    if (!session) return { error: "Esa mesa ya no está ocupada" };
+    if (session.id === room.sessionId) return { error: "Esa es tu mesa 😉" };
+    // Se le arma el chat (vacío) a esa mesa; si aceptan, entran con el botón Chat de la carta o el QR del mozo.
+    to =
+      (await db.chatRoom.findFirst({ where: { sessionId: session.id, closedAt: null, linkedRoomIds: { isEmpty: true } } })) ??
+      (await db.chatRoom.create({
+        data: {
+          tenantId: ctx.tenant.id,
+          name: `Mesa ${await tableLabelOf(tenantDb(ctx.tenant.id), session.table)}`,
+          code: newCode(),
+          sessionId: session.id,
+          tableLabel: await tableLabelOf(tenantDb(ctx.tenant.id), session.table),
+        },
+      }));
+    viaWaiter = to.memberKeys.length === 0;
+    waiterId = session.waiterId;
+  }
+  if (!to || to.id === room.id) return { error: "Elegí otra mesa" };
 
   const since = new Date(Date.now() - INVITE_TTL_MS);
-  const [linked, between, rejected, mine] = await Promise.all([
-    db.chatRoom.count({ where: { closedAt: null, linkedRoomIds: { hasEvery: [room.id, target.id] } } }),
+  const [linked, between, rejected, mine, total] = await Promise.all([
+    db.chatRoom.count({ where: { closedAt: null, linkedRoomIds: { hasEvery: [room.id, to.id] } } }),
     db.chatInvite.count({
-      where: { status: "PENDING", createdAt: { gte: since }, OR: [{ fromRoomId: room.id, toRoomId: target.id }, { fromRoomId: target.id, toRoomId: room.id }] },
+      where: { status: "PENDING", createdAt: { gte: since }, OR: [{ fromRoomId: room.id, toRoomId: to.id }, { fromRoomId: to.id, toRoomId: room.id }] },
     }),
-    db.chatInvite.count({ where: { fromRoomId: room.id, toRoomId: target.id, status: "REJECTED" } }),
+    db.chatInvite.count({ where: { fromRoomId: room.id, toRoomId: to.id, status: "REJECTED" } }),
     db.chatInvite.count({ where: { fromRoomId: room.id, status: "PENDING", createdAt: { gte: since } } }),
+    db.chatInvite.count({ where: { fromRoomId: room.id } }),
   ]);
   if (linked) return { error: "Ya tienen un chat con esa mesa" };
   if (between) return { error: "Ya hay un brindis esperando respuesta con esa mesa" };
   // Si dijeron que no, esa noche no se les vuelve a insistir.
   if (rejected) return { error: "Esa mesa ya respondió. ¡Probá con otra!" };
   if (mine >= 3) return { error: "Tienen 3 brindis esperando respuesta. Esperá a que contesten." };
+  // Tope por noche, para que nadie se ponga pesado con todo el salón.
+  if (total >= MAX_BRINDIS) return { error: "Ya mandaron muchos brindis esta noche. ¡Disfruten la mesa! 🍻" };
 
-  await db.chatInvite.create({ data: { tenantId: ctx.tenant.id, fromRoomId: room.id, toRoomId: target.id } });
-  await refreshRooms(slug, ctx.tenant.id, [room, target]);
-  return { ok: `¡Brindis enviado a ${label(target)}! 🍻` };
+  const invite = await db.chatInvite.create({ data: { tenantId: ctx.tenant.id, fromRoomId: room.id, toRoomId: to.id, viaWaiter } });
+  if (viaWaiter) {
+    await notifyStaff(ctx.tenant.id, {
+      type: "brindis.mesa",
+      inviteId: invite.id,
+      fromLabel: label(room),
+      toLabel: label(to),
+      waiterId,
+    });
+    revalidatePath("/staff", "layout");
+    revalidatePath("/admin", "layout");
+  }
+  await refreshRooms(slug, ctx.tenant.id, [room, to]);
+  return {
+    ok: viaWaiter
+      ? `¡Listo! Le avisamos al mozo de la ${label(to)} para que les pregunte si se suman. 🍻`
+      : `¡Brindis enviado a ${label(to)}! 🍻`,
+  };
 }
 
 export async function answerBrindis(slug: string, code: string, inviteId: string, accept: boolean): Promise<Result & { jointCode?: string }> {
@@ -215,7 +277,8 @@ export async function uploadRoomPhoto(slug: string, code: string, dataUrl: strin
   await db.chatRoom.update({ where: { id: m.room.id }, data: { photoData: dataUrl, photoBy: m.guest.key, photoApprovals: [] } });
   await notifyStaff(m.ctx.tenant.id, { type: "muro" });
   await refreshRooms(slug, m.ctx.tenant.id, [m.room]);
-  return { ok: "¡Foto lista! Ahora alguien más de la mesa la tiene que aprobar." };
+  const alone = m.room.memberKeys.every((k) => k === m.guest.key);
+  return { ok: alone ? "¡Foto lista! Ya la ven las otras mesas." : "¡Foto lista! Ahora alguien más de la mesa la tiene que aprobar." };
 }
 
 /** Otra persona de la mesa aprueba (queda visible) o la rechaza (se borra). */

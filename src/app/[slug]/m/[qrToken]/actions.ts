@@ -1,9 +1,11 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { ActionState } from "@/lib/actions";
-import { defaultNickname, newDinerId, setDinerCookie } from "@/lib/diner";
+import { defaultNickname, newDinerId, readDiner, setDinerCookie } from "@/lib/diner";
+import { hasModule } from "@/lib/modules";
 import { buildModifiers, unitPrice } from "@/lib/order-lines";
 import { notifyStaff, notifyTable } from "@/lib/realtime/server";
 import { currentDiner, tableContext, type TableContext } from "@/lib/table-session";
@@ -47,6 +49,21 @@ export async function joinTable(slug: string, qrToken: string, nickname: string)
 
   let session = ctx.session;
   if (!session) {
+    // Un celular que estuvo en esta mesa cuando se cobró no la puede volver a abrir solo
+    // (por ejemplo, la pestaña quedó abierta y ya se fueron): si se volvieron a sentar, la abre el mozo.
+    const previous = await readDiner(ctx.tenant.id);
+    if (previous) {
+      const paid = await ctx.tdb.tableSession.findFirst({
+        where: {
+          id: previous.sessionId,
+          status: "CLOSED",
+          tableId: { in: ctx.members.map((m) => m.id) },
+          closedAt: { gte: new Date(Date.now() - 3 * 60 * 60 * 1000) },
+        },
+        select: { id: true },
+      });
+      if (paid) return err("Esta mesa ya se cobró. Si se volvieron a sentar, pedile al mozo que la abra.");
+    }
     // Primer comensal: se abre la mesa (sin mozo; el personal recibe el aviso).
     session = await ctx.tdb.tableSession.create({
       data: { tenantId: ctx.tenant.id, tableId: ctx.table.id, guests: 1 },
@@ -258,4 +275,23 @@ export async function callWaiter(slug: string, qrToken: string): Promise<Result>
   }
   refreshTable(ctx);
   return { ok: "Avisamos al mozo. Ya viene." };
+}
+
+/**
+ * Chat de la mesa desde la carta (botón "Chat"): si la mesa todavía no tiene, lo abre el primero que entra.
+ * Se cierra y se borra al cobrar la mesa, igual que el que arma el mozo.
+ */
+export async function openTableChat(slug: string, qrToken: string): Promise<Result & { code?: string }> {
+  const r = await ctxOrError(slug, qrToken);
+  if (!r.ok) return err(r.error);
+  const { ctx } = r;
+  if (!ctx.session || ctx.session.status !== "OPEN") return err("La mesa no está abierta");
+  if (!(await currentDiner(ctx))) return err("Primero unite a la mesa");
+  if (!(await hasModule(ctx.tenant.id, "MURO"))) return err("Este local no tiene el chat activo");
+  const open = await ctx.tdb.chatRoom.findFirst({ where: { sessionId: ctx.session.id, closedAt: null, linkedRoomIds: { isEmpty: true } } });
+  if (open) return { ok: "ok", code: open.code };
+  const room = await ctx.tdb.chatRoom.create({
+    data: { tenantId: ctx.tenant.id, name: `Mesa ${ctx.label}`, code: randomBytes(6).toString("base64url"), sessionId: ctx.session.id, tableLabel: ctx.label },
+  });
+  return { ok: "ok", code: room.code };
 }

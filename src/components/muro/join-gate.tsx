@@ -4,13 +4,26 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { ShieldCheck } from "lucide-react";
 import { FormError } from "@/components/ui/field";
-import { MURO_RULES } from "@/lib/muro/filter";
+import { RULES, type RulesKind } from "@/lib/muro/filter";
 import { joinMuro } from "@/app/[slug]/muro/actions";
 
 /** Antes de escribir: apodo, confirmar +18 y aceptar las reglas (si no, no se puede participar). */
-export function JoinGate({ slug, title, subtitle }: { slug: string; title: string; subtitle: string }) {
+export function JoinGate({
+  slug,
+  title,
+  subtitle,
+  kind = "wall",
+  defaultName = "",
+}: {
+  slug: string;
+  title: string;
+  subtitle: string;
+  kind?: RulesKind;
+  /** Apodo que ya usa en la mesa (si pidió desde el QR), para no escribirlo de nuevo. */
+  defaultName?: string;
+}) {
   const router = useRouter();
-  const [name, setName] = useState("");
+  const [name, setName] = useState(defaultName);
   const [adult, setAdult] = useState(false);
   const [rules, setRules] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,10 +61,10 @@ export function JoinGate({ slug, title, subtitle }: { slug: string; title: strin
 
       <div className="rounded-2xl border border-line bg-surface p-4">
         <p className="mb-2 flex items-center gap-2 text-sm font-semibold">
-          <ShieldCheck className="size-4 text-brand" aria-hidden /> Reglas del muro
+          <ShieldCheck className="size-4 text-brand" aria-hidden /> {kind === "wall" ? "Reglas del muro" : "Reglas del chat"}
         </p>
         <ul className="list-disc space-y-1 pl-5 text-sm text-muted">
-          {MURO_RULES.map((r) => (
+          {RULES[kind].map((r) => (
             <li key={r}>{r}</li>
           ))}
         </ul>

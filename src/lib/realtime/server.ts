@@ -39,7 +39,9 @@ export type StaffEvent =
   | { type: "booking.new"; name: string; party: number; startsAt: string; tables: string }
   | { type: "booking.cancelled"; name: string; startsAt: string }
   // Muro y chat: hay mensajes nuevos o reportados para moderar (refresca el panel, sin aviso).
-  | { type: "muro" };
+  | { type: "muro" }
+  // Brindis a una mesa sin chat abierto: aviso a su mozo para que les pregunte en persona.
+  | { type: "brindis.mesa"; inviteId: string; fromLabel: string; toLabel: string; waiterId: string | null };
 
 export type TableEvent =
   | { type: "cart" } // alguien de la mesa cambió el carrito
