@@ -115,6 +115,9 @@ function formatter(r: Pick<Region, "currency" | "locale">, decimals: boolean) {
 /** Monedas que se usan sin centavos en la práctica (precios redondos): solo muestran decimales si los hay. */
 const ROUND_CURRENCIES = new Set(["ARS", "CLP", "COP", "PYG", "UYU"]);
 
+/** Moneda que se maneja sin centavos (los promedios se redondean a la unidad). */
+export const isRoundCurrency = (currency: string) => ROUND_CURRENCIES.has(currency);
+
 /** 1250 → "12,50 €" (EUR) · 1250000 → "$ 12.500" (ARS). */
 export function formatMoney(cents: number, r: Pick<Region, "currency" | "locale"> = DEFAULT_REGION) {
   const decimals = !ROUND_CURRENCIES.has(r.currency) || cents % 100 !== 0;

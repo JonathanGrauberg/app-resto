@@ -284,16 +284,23 @@ async function main() {
               createdAt: new Date(opened.getTime() + 8 * 60_000),
               acceptedAt: new Date(opened.getTime() + 9 * 60_000),
               items: {
-                create: lines.map((l) => ({
-                  tenantId,
-                  productId: l.p.id,
-                  name: l.p.name,
-                  unitPriceCents: l.p.priceCents,
-                  quantity: l.q,
-                  station: l.p.station,
-                  status: "DELIVERED" as const,
-                  deliveredAt: new Date(opened.getTime() + 40 * 60_000),
-                })),
+                create: lines.map((l) => {
+                  // Tiempos realistas: parrilla 12–35 min, barra 2–8; el mozo tarda 1–6 en llevarlo.
+                  const accepted = opened.getTime() + 9 * 60_000;
+                  const prep = l.p.station === "KITCHEN" ? between(12, 35) : l.p.station === "BAR" ? between(2, 8) : 0;
+                  const readyAt = new Date(accepted + prep * 60_000);
+                  return {
+                    tenantId,
+                    productId: l.p.id,
+                    name: l.p.name,
+                    unitPriceCents: l.p.priceCents,
+                    quantity: l.q,
+                    station: l.p.station,
+                    status: "DELIVERED" as const,
+                    readyAt,
+                    deliveredAt: new Date(readyAt.getTime() + between(1, 6) * 60_000),
+                  };
+                }),
               },
             },
           },
