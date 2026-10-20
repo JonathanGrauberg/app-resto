@@ -18,6 +18,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
     { href: "/admin/mesas?vista=sala", label: "Sala en vivo", icon: "sala" },
     { href: "/admin/personal", label: "Personal", icon: "personal" },
     ...(modules.has("RESERVAS") ? [{ href: "/admin/reservas", label: "Reservas", icon: "reservas" } as const] : []),
+    ...(modules.has("MURO") ? [{ href: "/admin/muro", label: "Muro", icon: "muro" } as const] : []),
     ...(modules.has("COMPRAS") ? [{ href: "/admin/compras", label: "Compras", icon: "compras" } as const] : []),
     ...(modules.has("BI") ? [{ href: "/admin/metricas", label: "Métricas", icon: "metricas" } as const] : []),
     { href: "/admin/ajustes", label: "Ajustes", icon: "ajustes" },

@@ -21,7 +21,7 @@ export default async function TicketPage({ params, searchParams }: PageProps<"/s
   const { tdb, tenant } = await requireTenantRole(CAN_MANAGE_TABLES);
   const region = await getRegion(tenant.id);
   const formatPrice = (cents: number) => formatMoney(cents, region);
-  const time = (iso: string) => new Date(iso).toLocaleTimeString(region.locale, { hour: "2-digit", minute: "2-digit", timeZone: region.timezone });
+  const time = (iso: string) => new Date(iso).toLocaleTimeString(region.locale, { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: region.timezone });
   const date = (iso: string) =>
     new Date(iso).toLocaleDateString(region.locale, { day: "2-digit", month: "2-digit", year: "numeric", timeZone: region.timezone });
   const { sessionId } = await params;

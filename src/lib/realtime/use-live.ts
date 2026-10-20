@@ -13,13 +13,16 @@ import { useEffect, useRef } from "react";
 export function useLive({
   scope,
   slug,
+  code,
   channel,
   enabled = true,
   fallbackMs = 15_000,
   onEvent,
 }: {
-  scope: "staff" | "mesa";
+  scope: "staff" | "mesa" | "muro" | "chat";
   slug?: string;
+  /** Muro / chat: código del QR o de la pantalla. */
+  code?: string;
   /** Nombre del canal a escuchar (lo arma el servidor; acá solo se usa). */
   channel: string | null;
   enabled?: boolean;
@@ -37,7 +40,7 @@ export function useLive({
     let cancelled = false;
     let live = false;
     let realtime: { close: () => void } | null = null;
-    const url = `/api/realtime/token?scope=${scope}${slug ? `&slug=${encodeURIComponent(slug)}` : ""}`;
+    const url = `/api/realtime/token?scope=${scope}${slug ? `&slug=${encodeURIComponent(slug)}` : ""}${code ? `&code=${encodeURIComponent(code)}` : ""}`;
 
     // Respaldo: si no hay conexión en vivo, refrescar periódicamente con la pestaña visible.
     const poll = setInterval(() => {
@@ -77,5 +80,5 @@ export function useLive({
       clearInterval(poll);
       realtime?.close();
     };
-  }, [enabled, channel, scope, slug, fallbackMs, router]);
+  }, [enabled, channel, scope, slug, code, fallbackMs, router]);
 }

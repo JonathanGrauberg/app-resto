@@ -103,7 +103,7 @@ export function StaffLive({
       // Reservas online: a caja / admin.
       if (e.type === "booking.new" || e.type === "booking.cancelled") {
         if (has("OWNER", "ADMIN", "CAJA")) {
-          const when = new Date(String(e.startsAt)).toLocaleString("es-ES", { weekday: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+          const when = new Date(String(e.startsAt)).toLocaleString("es-ES", { weekday: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
           push(
             e.type === "booking.new"
               ? { kind: "booking", title: `Nueva reserva · ${e.name} (${e.party})`, detail: `${when} · Mesa ${e.tables}` }

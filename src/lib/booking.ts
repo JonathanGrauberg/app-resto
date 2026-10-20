@@ -314,6 +314,6 @@ export async function releaseReservation(tdb: TenantDb, id: string, status: "CAN
 /** Texto de fecha para personas: "sábado 10 de octubre · 21:30". */
 export function formatBooking(d: Date, tz: string) {
   const date = d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", timeZone: tz });
-  const time = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: tz });
+  const time = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: tz });
   return `${date} · ${time}`;
 }

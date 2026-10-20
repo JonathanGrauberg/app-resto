@@ -10,6 +10,7 @@ import {
   ChefHat,
   LayoutDashboard,
   LayoutGrid,
+  MessagesSquare,
   Layers,
   Settings,
   ShoppingCart,
@@ -36,6 +37,7 @@ const ICONS = {
   sala: Armchair,
   compras: ShoppingCart,
   planes: Layers,
+  muro: MessagesSquare,
 };
 
 export type NavIcon = keyof typeof ICONS;

@@ -6,6 +6,7 @@ import { ClosedToday } from "@/components/sala/closed-today";
 import { SalaView } from "@/components/sala/sala-view";
 import { TableLegend } from "@/components/table-map";
 import { requireTenantRole } from "@/lib/auth/guards";
+import { hasModule } from "@/lib/modules";
 import { getPublicMenu } from "@/lib/public-menu";
 import { ADMIN_ROLES, rolesOf } from "@/lib/auth/permissions";
 import { cn } from "@/lib/format";
@@ -59,6 +60,7 @@ export default async function AdminMesasPage({ searchParams }: PageProps<"/admin
           slug={tenant.slug}
           venue={tenant.name}
           menu={menu}
+        muro={await hasModule(tenant.id, "MURO")}
         />
         <ClosedToday rows={closed} />
       </>

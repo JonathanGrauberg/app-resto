@@ -61,7 +61,7 @@ export function ShiftBar({
     <div className="mb-5 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl border border-line bg-surface p-4 text-sm">
       <span className="flex items-center gap-2 font-semibold">
         <LockKeyholeOpen className="size-5 text-ok" aria-hidden />
-        Turno abierto desde {new Date(shift.openedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
+        Turno abierto desde {new Date(shift.openedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}
       </span>
       <span>
         <span className="text-muted">Cobrado</span> <strong className="tabular-nums">{formatPrice(shift.salesCents)}</strong>

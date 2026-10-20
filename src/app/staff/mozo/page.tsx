@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { SalaView } from "@/components/sala/sala-view";
 import { requireTenantRole } from "@/lib/auth/guards";
+import { hasModule } from "@/lib/modules";
 import { getPublicMenu } from "@/lib/public-menu";
 import { CAN_MANAGE_TABLES, rolesOf } from "@/lib/auth/permissions";
 import { getSalaData } from "@/lib/sala";
@@ -19,6 +20,7 @@ export default async function MozoPage() {
         slug={tenant.slug}
         venue={tenant.name}
         menu={menu}
+        muro={await hasModule(tenant.id, "MURO")}
       />
     </div>
   );

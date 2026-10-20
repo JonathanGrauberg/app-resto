@@ -3,6 +3,7 @@ import { ClosedToday } from "@/components/sala/closed-today";
 import { SalaView } from "@/components/sala/sala-view";
 import { ShiftBar } from "@/components/sala/shift-bar";
 import { requireTenantRole } from "@/lib/auth/guards";
+import { hasModule } from "@/lib/modules";
 import { rolesOf } from "@/lib/auth/permissions";
 import { getPublicMenu } from "@/lib/public-menu";
 import { getClosedToday, getSalaData } from "@/lib/sala";
@@ -30,6 +31,7 @@ export default async function CajaPage() {
         slug={tenant.slug}
         venue={tenant.name}
         menu={menu}
+        muro={await hasModule(tenant.id, "MURO")}
       />
       <ClosedToday rows={closed} />
     </div>

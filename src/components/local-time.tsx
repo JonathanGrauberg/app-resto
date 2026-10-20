@@ -12,7 +12,7 @@ export function LocalTime({ iso }: { iso: string }) {
   const mounted = useSyncExternalStore(subscribe, () => true, () => false);
   return (
     <time dateTime={iso} suppressHydrationWarning>
-      {mounted ? new Date(iso).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : "--:--"}
+      {mounted ? new Date(iso).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }) : "--:--"}
     </time>
   );
 }

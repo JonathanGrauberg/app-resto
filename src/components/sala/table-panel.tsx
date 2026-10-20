@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   Armchair,
   CalendarClock,
+  MessagesSquare,
   Clock,
   ExternalLink,
   Link2,
@@ -29,6 +30,7 @@ import { STATUS_STYLE } from "@/components/table-map";
 import { cn } from "@/lib/format";
 import type { SalaReservation, SalaSession, SalaTable } from "@/lib/sala";
 import { seatReservation } from "@/app/admin/reservas/actions";
+import { createChatGroup } from "@/app/admin/muro/actions";
 import {
   addExtraTable,
   assignWaiter,
@@ -54,6 +56,7 @@ export function TablePanel({
   areaName,
   areaId,
   menu,
+  muro = false,
   waiters,
   me,
   now,
@@ -71,6 +74,8 @@ export function TablePanel({
   areaName: string;
   areaId: string;
   menu: PublicMenu;
+  /** El local tiene el módulo Muro: se puede armar el grupo de chat de la mesa. */
+  muro?: boolean;
   waiters: { id: string; name: string }[];
   me: Me;
   now: number | null;
@@ -82,6 +87,8 @@ export function TablePanel({
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<{ ok?: string; error?: string } | null>(null);
   const [showQr, setShowQr] = useState(false);
+  const [chat, setChat] = useState<{ code: string; name: string } | null>(null);
+  const [chatName, setChatName] = useState<string | null>(null);
   const [extraSeats, setExtraSeats] = useState<number | null>(null);
   const [composing, setComposing] = useState(false);
   const [paying, setPaying] = useState(false);
@@ -139,7 +146,7 @@ export function TablePanel({
           <p className="flex items-center gap-2 font-semibold">
             <CalendarClock className="size-4" aria-hidden />
             Reserva{" "}
-            {new Date(reservation.startsAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: timezone })} ·{" "}
+            {new Date(reservation.startsAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: timezone })} ·{" "}
             {reservation.name} ({reservation.party})
           </p>
           {reservation.notes && <p className="mt-1 text-muted">“{reservation.notes}”</p>}
@@ -430,7 +437,48 @@ export function TablePanel({
             >
               <ExternalLink className="size-4" aria-hidden /> Ver como comensal
             </a>
+            {muro && session && session.status !== "PENDING_PAYMENT" && (
+              <button
+                onClick={() => setChatName(title)}
+                className="col-span-2 inline-flex items-center justify-center gap-2 rounded-xl border border-brand/40 py-2.5 text-sm font-medium text-brand hover:bg-brand-soft"
+              >
+                <MessagesSquare className="size-4" aria-hidden /> Armar grupo de chat
+              </button>
+            )}
           </section>
+          {chatName !== null && session && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                start(async () => {
+                  const res = await createChatGroup(chatName, session.id);
+                  if (res?.error || !res?.code) return setMsg({ error: res?.error ?? "No se pudo armar el grupo" });
+                  setChat({ code: res.code, name: chatName });
+                  setChatName(null);
+                });
+              }}
+              className="space-y-2 rounded-xl border border-brand/40 bg-brand-soft/40 p-3"
+            >
+              <p className="text-sm font-medium">¿Cómo se llama el grupo? Lo eligen los de la mesa.</p>
+              <input
+                value={chatName}
+                onChange={(e) => setChatName(e.target.value)}
+                maxLength={40}
+                autoFocus
+                aria-label="Nombre del grupo"
+                className="h-10 w-full rounded-lg border border-line bg-surface px-3 text-base sm:text-sm"
+              />
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setChatName(null)} className="flex-1 rounded-lg py-2 text-sm hover:bg-ink/5">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={pending || chatName.trim().length < 2} className="flex-1 rounded-lg bg-brand py-2 text-sm font-semibold text-brand-ink disabled:opacity-50">
+                  Crear y mostrar QR
+                </button>
+              </div>
+              <p className="text-xs text-muted">Se borra solo cuando se cobra la mesa. Para entrar, cada uno confirma +18 y acepta las reglas.</p>
+            </form>
+          )}
         </>
       )}
 
@@ -472,6 +520,8 @@ export function TablePanel({
           }}
         />
       )}
+
+      {chat && <QrDialog path={`/${slug}/chat/${chat.code}`} title={`Chat · ${chat.name}`} venue={venue} caption="Escaneá para sumarte al chat de la mesa (+18)" onClose={() => setChat(null)} />}
 
       {showQr && (
         <QrDialog

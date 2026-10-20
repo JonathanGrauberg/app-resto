@@ -51,7 +51,7 @@ export default async function ReceiptPage({ params }: PageProps<"/[slug]/cuenta/
       <p className="mt-8 text-center text-xs text-muted">
         Documento informativo · No válido como factura · {COUNTRIES[region.country].taxNote}
         {r.expiresAt &&
-          ` · Disponible hasta el ${new Date(r.expiresAt).toLocaleString(region.locale, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: region.timezone })}`}
+          ` · Disponible hasta el ${new Date(r.expiresAt).toLocaleString(region.locale, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: region.timezone })}`}
       </p>
     </main>
   );

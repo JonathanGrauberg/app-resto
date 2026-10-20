@@ -19,10 +19,16 @@ export const PLANS: { id: string; label: string; description: string; modules: M
     modules: ["CARTA_QR", "PEDIDOS", "KDS", "CAJA"],
   },
   {
+    id: "muro",
+    label: "Muro",
+    description: "Solo el Muro: mensajes en pantalla y chat de mesa. Sirve aunque el local use otro sistema.",
+    modules: ["MURO"],
+  },
+  {
     id: "completo",
     label: "Completo",
-    description: "Todo lo del Salón, más reservas, métricas y compras.",
-    modules: ["CARTA_QR", "PEDIDOS", "KDS", "CAJA", "RESERVAS", "BI", "COMPRAS"],
+    description: "Todo lo del Salón, más reservas, métricas, compras y el Muro.",
+    modules: ["CARTA_QR", "PEDIDOS", "KDS", "CAJA", "RESERVAS", "BI", "COMPRAS", "MURO"],
   },
 ];
 

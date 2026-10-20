@@ -37,7 +37,9 @@ export type StaffEvent =
   | { type: "table.pending"; tableLabel: string; sessionId: string; waiterName: string; byId: string }
   // Reservas online: aviso a caja / admin.
   | { type: "booking.new"; name: string; party: number; startsAt: string; tables: string }
-  | { type: "booking.cancelled"; name: string; startsAt: string };
+  | { type: "booking.cancelled"; name: string; startsAt: string }
+  // Muro y chat: hay mensajes nuevos o reportados para moderar (refresca el panel, sin aviso).
+  | { type: "muro" };
 
 export type TableEvent =
   | { type: "cart" } // alguien de la mesa cambió el carrito
@@ -46,6 +48,10 @@ export type TableEvent =
 
 export const staffChannel = (tenantId: string) => `t:${tenantId}:staff`;
 export const tableChannel = (tenantId: string, sessionId: string) => `t:${tenantId}:mesa:${sessionId}`;
+/** Muro de un evento: lo escuchan la pantalla y quienes escriben. */
+export const wallChannel = (tenantId: string, wallId: string) => `t:${tenantId}:muro:${wallId}`;
+/** Chat de una mesa o grupo. */
+export const chatChannel = (tenantId: string, roomId: string) => `t:${tenantId}:chat:${roomId}`;
 
 let rest: Ably.Rest | null = null;
 export function realtimeEnabled() {
@@ -82,3 +88,6 @@ export async function createSubscribeToken(clientId: string, channels: string[])
     capability: Object.fromEntries(channels.map((ch) => [ch, ["subscribe"]])),
   });
 }
+
+/** Avisa "hay mensajes nuevos" a un muro o a un chat (el contenido se vuelve a pedir al servidor). */
+export const notifyChannel = (channel: string) => publish(channel, { type: "messages" } as never);

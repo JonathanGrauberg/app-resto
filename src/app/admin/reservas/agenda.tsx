@@ -60,7 +60,7 @@ function ReservationRow({ r, timezone }: { r: Row; timezone: string }) {
       router.refresh();
     });
   };
-  const time = new Date(r.startsAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: timezone });
+  const time = new Date(r.startsAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: timezone });
   const st = STATUS[r.status];
   const done = r.status === "CANCELLED" || r.status === "NO_SHOW";
 

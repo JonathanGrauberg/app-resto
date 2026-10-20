@@ -19,6 +19,7 @@ export function SalaView({
   slug,
   venue,
   menu,
+  muro = false,
 }: {
   data: SalaData;
   me: Me;
@@ -26,6 +27,8 @@ export function SalaView({
   venue: string;
   /** Carta, para que el mozo tome pedidos desde el panel de la mesa. */
   menu: PublicMenu;
+  /** Módulo Muro activo: botón "Armar grupo de chat" en la mesa. */
+  muro?: boolean;
 }) {
   const router = useRouter();
   const now = useNow();
@@ -487,6 +490,7 @@ export function SalaView({
                 venue={venue}
                 areaId={data.areas.find((a) => a.tables.some((t) => t.id === selected.id))?.id ?? area.id}
                 menu={menu}
+                muro={muro}
                 onJoin={() => startJoinMode(selected)}
                 onDone={() => router.refresh()}
               />
@@ -507,4 +511,4 @@ function reservationFor(list: SalaReservation[], members: SalaTable[]) {
   return list.find((r) => r.tableIds.some((id) => members.some((m) => m.id === id))) ?? null;
 }
 
-const hhmm = (iso: string, tz: string) => new Date(iso).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: tz });
+const hhmm = (iso: string, tz: string) => new Date(iso).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: tz });

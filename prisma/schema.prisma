@@ -24,6 +24,7 @@ enum ModuleKey {
   BI
   MULTI_IDIOMA
   COMPRAS
+  MURO
 }
 
 model Tenant {
@@ -48,6 +49,10 @@ model Tenant {
   reservations   Reservation[]
   waitlist       WaitlistEntry[]
   purchases      Purchase[]
+  walls          Wall[]
+  wallMessages   WallMessage[]
+  chatRooms      ChatRoom[]
+  chatMessages   ChatMessage[]
   events         Event[]
   notifications  Notification[]
   translations   Translation[]
@@ -102,21 +107,23 @@ model TenantSettings {
   /// Franjas en que se puede reservar, por día: { "mon": [["13:00","15:30"],["20:00","23:00"]], ... } (hora de llegada).
   bookingHours       Json?
   /// Cuánto ocupa una reserva la mesa.
-  bookingDurationMin Int     @default(90)
+  bookingDurationMin Int      @default(90)
   /// Cada cuántos minutos se ofrece un horario (13:00, 13:30…).
-  bookingSlotMin     Int     @default(30)
+  bookingSlotMin     Int      @default(30)
   /// Tolerancia de espera: pasado este tiempo sin llegar, la reserva se da por no presentada y libera la mesa.
-  bookingGraceMin    Int     @default(15)
+  bookingGraceMin    Int      @default(15)
   /// Antelación mínima para reservar online.
-  bookingLeadMin     Int     @default(60)
+  bookingLeadMin     Int      @default(60)
   /// Hasta cuántos días adelante se puede reservar.
-  bookingMaxDays     Int     @default(30)
+  bookingMaxDays     Int      @default(30)
   /// Máximo de personas por reserva online (más que esto: por teléfono).
-  bookingMaxParty    Int     @default(8)
+  bookingMaxParty    Int      @default(8)
   /// Texto para el cliente al reservar (política, cómo llegar…).
   bookingNotice      String?
   /// Con gente en la lista de espera, la web no ofrece horarios dentro de estos minutos (0 = no se frena).
-  waitlistHoldMin    Int     @default(90)
+  waitlistHoldMin    Int      @default(90)
+  /// Muro y chat: palabras que el local agrega a la lista de no permitidas.
+  blockedWords       String[] @default([])
 }
 
 model TenantModule {
@@ -748,4 +755,98 @@ model CashShift {
   payments Payment[]
 
   @@index([tenantId, openedAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Muro: mensajes en pantalla gigante por evento, y chat de mesa
+// ─────────────────────────────────────────────────────────────
+
+enum WallModeration {
+  AUTO // sale en pantalla al instante (con filtro de palabras)
+  APPROVE // el local aprueba cada mensaje antes de mostrarlo
+}
+
+enum WallMessageStatus {
+  VISIBLE
+  PENDING
+  HIDDEN
+}
+
+/**
+ * Un muro de evento (despedida, cumpleaños, fin de año…): se escribe por QR y se ve en la pantalla del local.
+ */
+model Wall {
+  id          String         @id @default(cuid())
+  tenantId    String
+  tenant      Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  startsAt    DateTime
+  endsAt      DateTime
+  /// Código del QR para escribir (público).
+  code        String         @unique
+  /// Enlace secreto de la pantalla (lo abre el local en la tele o el proyector).
+  screenToken String         @unique
+  moderation  WallModeration @default(AUTO)
+  /// Personas bloqueadas por el local en este muro (id de la cookie).
+  blockedKeys String[]       @default([])
+  createdAt   DateTime       @default(now())
+
+  messages WallMessage[]
+
+  @@index([tenantId, startsAt])
+}
+
+model WallMessage {
+  id         String            @id @default(cuid())
+  tenantId   String
+  tenant     Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  wallId     String
+  wall       Wall              @relation(fields: [wallId], references: [id], onDelete: Cascade)
+  authorKey  String
+  authorName String
+  text       String
+  status     WallMessageStatus @default(VISIBLE)
+  createdAt  DateTime          @default(now())
+
+  @@index([wallId, status, createdAt])
+}
+
+/**
+ * Grupo de chat de una mesa (lo arma el mozo). Se cierra y se borra al cobrar la mesa.
+ */
+model ChatRoom {
+  id          String    @id @default(cuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  /// Código del QR del grupo (público).
+  code        String    @unique
+  /// Mesa a la que pertenece (se cierra con ella). Null = grupo suelto del local.
+  sessionId   String?
+  tableLabel  String?
+  blockedKeys String[]  @default([])
+  closedAt    DateTime?
+  createdAt   DateTime  @default(now())
+
+  messages ChatMessage[]
+
+  @@index([tenantId, closedAt])
+  @@index([sessionId])
+}
+
+model ChatMessage {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  roomId     String
+  room       ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  authorKey  String
+  authorName String
+  text       String
+  hidden     Boolean  @default(false)
+  /// Quiénes lo reportaron (con 2 reportes se oculta solo).
+  reportedBy String[] @default([])
+  createdAt  DateTime @default(now())
+
+  @@index([roomId, createdAt])
 }

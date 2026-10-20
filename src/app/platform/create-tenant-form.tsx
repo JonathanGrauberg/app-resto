@@ -44,7 +44,7 @@ export function CreateTenantForm() {
       </div>
       <fieldset className="sm:col-span-2">
         <legend className="mb-1.5 text-sm font-medium">Plan inicial</legend>
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {PLANS.map((p, i) => (
             <label
               key={p.id}

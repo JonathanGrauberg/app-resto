@@ -217,7 +217,7 @@ export function WaitlistPanel({
                           {t.reservedAt && (
                             <span className="block text-[11px]">
                               Reservada{" "}
-                              {new Date(t.reservedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: timezone })}
+                              {new Date(t.reservedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: timezone })}
                             </span>
                           )}
                         </button>

@@ -10,7 +10,7 @@ import type { SalaSession } from "@/lib/sala";
 import { acceptOrder, rejectOrder } from "@/app/staff/sala-actions";
 import { deliverItems } from "@/app/staff/kds-actions";
 
-const time = (iso: string) => new Date(iso).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+const time = (iso: string) => new Date(iso).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 
 /**
  * Pedidos de la mesa para el personal:

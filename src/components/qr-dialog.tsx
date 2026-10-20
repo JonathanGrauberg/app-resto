@@ -13,12 +13,15 @@ export function QrDialog({
   path,
   title,
   venue,
+  caption = "Escaneá para ver la carta y pedir",
   onClose,
 }: {
   /** Ruta pública, ej. `/la-casona/m/<qrToken>`. */
   path: string;
   title: string;
   venue: string;
+  /** Texto bajo el QR. */
+  caption?: string;
   onClose: () => void;
 }) {
   const [svg, setSvg] = useState("");
@@ -49,7 +52,7 @@ export function QrDialog({
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#9a6b1f]">{venue}</p>
         <p className="mt-1 text-3xl font-black">{title}</p>
         <div className="mx-auto my-5 aspect-square w-full max-w-64 [&_svg]:size-full" dangerouslySetInnerHTML={{ __html: svg }} />
-        <p className="font-medium">Escaneá para ver la carta y pedir</p>
+        <p className="font-medium">{caption}</p>
 
         <div className="mt-5 grid grid-cols-2 gap-2 print:hidden">
           <button

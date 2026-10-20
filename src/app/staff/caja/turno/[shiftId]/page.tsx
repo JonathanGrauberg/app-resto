@@ -19,7 +19,7 @@ export default async function ShiftPage({ params }: PageProps<"/staff/caja/turno
   const region = await getRegion(tenant.id);
   const formatPrice = (cents: number) => formatMoney(cents, region);
   const dt = (iso: string) =>
-    new Date(iso).toLocaleString(region.locale, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: region.timezone });
+    new Date(iso).toLocaleString(region.locale, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: region.timezone });
   // Medios del país, más cualquier otro que se haya usado en el turno.
   const methods = COUNTRIES[region.country].payments;
   const { shiftId } = await params;

@@ -18,7 +18,7 @@ export default async function PlansPage() {
   return (
     <>
       <PageHeader title="Planes" description="Combinaciones de módulos para dar de alta un local. En cada local se puede ajustar módulo por módulo." />
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {PLANS.map((p) => (
           <Card key={p.id} className="p-5">
             <div className="flex items-baseline justify-between">
