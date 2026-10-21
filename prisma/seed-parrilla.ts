@@ -111,7 +111,7 @@ async function main() {
         create: {
           ...regionSettingsFor("AR"),
           tagline: "Parrilla de barrio, a fuego lento",
-          description: "Cortes a la leña, achuras y empanadas de horno de barro. Demo de app-resto.",
+          description: "Cortes a la leña, achuras y empanadas de horno de barro. Demo de Yatay.",
           address: "Paraná, Entre Ríos",
           menuTheme: "DARK",
           prepMode: "SEPARATE",

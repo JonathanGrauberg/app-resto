@@ -1,6 +1,6 @@
-# app-resto — Roadmap y arquitectura
+# Yatay — Roadmap y arquitectura
 
-> Nombre provisorio. SaaS multi-tenant para restaurantes, bares y restobares. Mercado inicial: España.
+> Yatay (yatay.app). SaaS multi-tenant para restaurantes, bares y restobares. Mercados: Argentina y España.
 > Última actualización: 2026-10-01
 
 ---

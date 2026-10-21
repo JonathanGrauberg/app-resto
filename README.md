@@ -1,7 +1,8 @@
-# app-resto
+# Yatay
 
-SaaS multi-tenant para restaurantes, bares y restobares (mercado inicial: España).
-Carta QR, pedidos, sala, cocina/bar, caja, reservas y métricas. Nombre provisorio.
+SaaS multi-tenant para restaurantes, bares y restobares (Argentina y España). Dominio: yatay.app.
+Carta QR, pedidos, sala, cocina/bar, caja, reservas, compras, métricas y Muro.
+El nombre viene del yatay, la palmera de Entre Ríos (hecho en Paraná).
 
 Roadmap y arquitectura: [docs/ROADMAP.md](docs/ROADMAP.md).
 
