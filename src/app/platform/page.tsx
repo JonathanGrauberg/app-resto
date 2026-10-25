@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, Clock, Plus, Sparkles } from "lucide-react";
+import { AlertTriangle, Clock, Plus, Sparkles, Wallet } from "lucide-react";
 import { PageHeader } from "@/components/app-shell";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { requirePlatformAdmin } from "@/lib/auth/guards";
+import { BRAND } from "@/lib/brand";
 import { MODULES } from "@/lib/modules";
-import { sessionsPerDay, tenantsOverview, upcomingBookings } from "@/lib/platform";
-import { COUNTRIES, formatMoney } from "@/lib/region";
+import { billingThisMonth, sessionsPerDay, tenantsOverview, upcomingBookings } from "@/lib/platform";
+import { COUNTRIES, formatMoney, regionOf } from "@/lib/region";
 
 export const metadata: Metadata = { title: "Plataforma" };
 
@@ -17,7 +18,7 @@ const ago = (days: number | null) => (days === null ? "nunca" : days === 0 ? "ho
 export default async function PlatformHome() {
   await requirePlatformAdmin();
   const tenants = await tenantsOverview();
-  const [perDay, bookings] = await Promise.all([sessionsPerDay(tenants), upcomingBookings()]);
+  const [perDay, bookings, collected] = await Promise.all([sessionsPerDay(tenants), upcomingBookings(), billingThisMonth()]);
 
   const active = tenants.filter((t) => t.active);
   const newThisMonth = tenants.filter((t) => t.createdThisMonth).length;
@@ -33,6 +34,20 @@ export default async function PlatformHome() {
   const byCountry = Object.entries(COUNTRIES)
     .map(([code, c]) => ({ code, label: c.label, count: active.filter((t) => t.region.country === code).length }))
     .filter((c) => c.count);
+
+  // Cobros de Yatay: ingreso mensual de los que están al día, por moneda.
+  const mrr = new Map<string, number>();
+  for (const t of active) if (t.billing.kind === "active") mrr.set(t.region.currency, (mrr.get(t.region.currency) ?? 0) + t.priceCents);
+  const money = (cents: number, currency: string) => formatMoney(cents, regionOf({ country: currency === "EUR" ? "ES" : "AR", currency }));
+  const paying = active.filter((t) => t.billing.kind === "active").length;
+  const trials = active.filter((t) => t.billing.kind === "trial");
+  const overdue = active.filter((t) => t.billing.kind === "overdue");
+  const unset = active.filter((t) => t.billing.kind === "none");
+  const toCollect = [
+    ...overdue,
+    ...trials.filter((t) => t.billing.kind === "trial" && t.billing.daysLeft <= 5),
+    ...active.filter((t) => t.billing.kind === "active" && t.billing.daysLeft <= 5),
+  ];
 
   // Alertas
   const idle = active.filter((t) => t.idle);
@@ -70,6 +85,40 @@ export default async function PlatformHome() {
           <p className="text-xs text-muted">Lo que cobraron los locales (no es facturación de la plataforma)</p>
         </Card>
         <Stat label="Reservas próximas" value={`${bookings}`} hint="Confirmadas, próximos 7 días" />
+      </div>
+
+      <h2 className="mb-3 mt-6 flex items-center gap-2 font-semibold">
+        <Wallet className="size-4" aria-hidden /> Cobros de {BRAND.name}
+      </h2>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Card className="p-4">
+          <p className="text-sm text-muted">Ingreso mensual</p>
+          {mrr.size === 0 ? (
+            <p className="mt-1 text-2xl font-bold">—</p>
+          ) : (
+            [...mrr].map(([cur, cents]) => (
+              <p key={cur} className="mt-1 text-xl font-bold tabular-nums">
+                {money(cents, cur)}
+              </p>
+            ))
+          )}
+          <p className="text-xs text-muted">{paying === 1 ? "1 local al día" : `${paying} locales al día`}</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-sm text-muted">Cobrado este mes</p>
+          {collected.length === 0 ? (
+            <p className="mt-1 text-2xl font-bold">—</p>
+          ) : (
+            collected.map((c) => (
+              <p key={c.currency} className="mt-1 text-xl font-bold tabular-nums">
+                {money(c.cents, c.currency)}
+              </p>
+            ))
+          )}
+          <p className="text-xs text-muted">{collected.reduce((n, c) => n + c.count, 0)} pagos registrados</p>
+        </Card>
+        <Stat label="En prueba gratis" value={`${trials.length}`} hint={unset.length ? `${unset.length} sin suscripción configurada` : "Todos los locales tienen suscripción"} />
+        <Stat label="Pagos vencidos" value={`${overdue.length}`} hint={overdue.length ? "Revisalos abajo" : "Nadie debe nada"} />
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-[1.6fr_1fr]">
@@ -132,7 +181,27 @@ export default async function PlatformHome() {
 
       {/* Alertas */}
       <h2 className="mb-3 mt-8 font-semibold">Para revisar</h2>
-      <div className="grid gap-3 lg:grid-cols-3">
+      <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
+        <AlertCard icon={<Wallet className="size-4" aria-hidden />} title="Para cobrar (vencidos o vencen en 5 días)" empty="No hay cobros pendientes.">
+          {toCollect.map((t) => (
+            <li key={t.id} className="flex justify-between gap-2">
+              <Link href={`/platform/locales/${t.id}`} className="truncate hover:underline">
+                {t.name}
+              </Link>
+              <span className={t.billing.kind === "overdue" ? "shrink-0 text-danger" : "shrink-0 text-muted"}>
+                {t.billing.kind === "overdue"
+                  ? t.billing.since
+                    ? `venció hace ${t.billing.days} días`
+                    : "nunca pagó"
+                  : t.billing.kind === "trial"
+                    ? `prueba: ${t.billing.daysLeft} días`
+                    : t.billing.kind === "active"
+                      ? `vence en ${t.billing.daysLeft} días`
+                      : ""}
+              </span>
+            </li>
+          ))}
+        </AlertCard>
         <AlertCard icon={<Clock className="size-4" aria-hidden />} title="Sin actividad hace 7 días o más" empty="Todos los locales activos se usaron esta semana.">
           {idle.map((t) => (
             <li key={t.id} className="flex justify-between gap-2">

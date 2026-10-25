@@ -14,8 +14,10 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   return (
     <main className="flex flex-1 items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm space-y-6">
-        <div className="text-center">
-          <BrandMark className="text-2xl" />
+        <div className="flex flex-col items-center text-center">
+          <Link href="/" aria-label="Inicio">
+            <BrandMark className="h-16" priority />
+          </Link>
           <p className="mt-1 text-sm text-muted">{BRAND.tagline}</p>
         </div>
         <Card className="p-5 sm:p-6">

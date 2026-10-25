@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { FormError, Input, Label, Select } from "@/components/ui/field";
 import { COUNTRIES } from "@/lib/region";
+import { TRIAL_MONTHS } from "@/lib/subscription";
 import { PLANS } from "@/lib/plans";
 import { createTenant } from "./actions";
 import { useFormAction } from "@/lib/use-form-action";
@@ -30,7 +31,7 @@ export function CreateTenantForm() {
       </div>
       <div>
         <Label htmlFor="country">País</Label>
-        <Select id="country" name="country" defaultValue="ES">
+        <Select id="country" name="country" defaultValue="AR">
           {Object.entries(COUNTRIES).map(([code, c]) => (
             <option key={code} value={code}>
               {c.label} · {c.currency}
@@ -41,6 +42,15 @@ export function CreateTenantForm() {
       <div>
         <Label htmlFor="ownerPassword">Contraseña inicial</Label>
         <Input id="ownerPassword" name="ownerPassword" type="password" minLength={8} autoComplete="new-password" required />
+      </div>
+      <div>
+        <Label htmlFor="trialMonths">Prueba gratis</Label>
+        <Select id="trialMonths" name="trialMonths" defaultValue={String(TRIAL_MONTHS)}>
+          <option value="0">Sin prueba</option>
+          <option value="1">1 mes</option>
+          <option value="3">3 meses</option>
+          <option value="6">6 meses</option>
+        </Select>
       </div>
       <fieldset className="sm:col-span-2">
         <legend className="mb-1.5 text-sm font-medium">Plan inicial</legend>

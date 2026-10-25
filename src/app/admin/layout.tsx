@@ -1,6 +1,7 @@
 import { AppShell, type NavItem } from "@/components/app-shell";
 import { RegionProvider } from "@/components/region-provider";
 import { StaffLive } from "@/components/staff-live";
+import { SubscriptionNotice } from "@/components/subscription-notice";
 import { getRegion } from "@/lib/region-server";
 import { requireTenantRole } from "@/lib/auth/guards";
 import { ADMIN_ROLES, rolesOf } from "@/lib/auth/permissions";
@@ -26,6 +27,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
 
   return (
     <AppShell title={tenant.name} subtitle="Administración" nav={nav} userName={user.name}>
+      <SubscriptionNotice tenantId={tenant.id} />
       <RegionProvider region={region}>{children}</RegionProvider>
       <StaffLive
         channel={staffChannel(tenant.id)}

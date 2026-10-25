@@ -3,6 +3,7 @@ import { LogOut } from "lucide-react";
 import { logout } from "@/app/login/actions";
 import { BrandMark } from "./brand-mark";
 import { NavLinks, type NavIcon } from "./nav-links";
+import { EntrySplash } from "./splash";
 
 export type NavItem = { href: string; label: string; icon: NavIcon };
 
@@ -25,10 +26,11 @@ export function AppShell({
 }) {
   return (
     <div className="flex min-h-dvh flex-1">
+      <EntrySplash />
       <aside className="sticky top-0 hidden h-dvh print:!hidden w-60 shrink-0 flex-col border-r border-line bg-surface md:flex">
         <div className="border-b border-line px-5 py-4">
-          <Link href="/" className="text-xs uppercase tracking-wider text-muted">
-            <BrandMark className="font-medium" />
+          <Link href="/" className="mb-3 block" aria-label="Yatay">
+            <BrandMark className="h-9" />
           </Link>
           <p className="truncate text-lg font-semibold">{title}</p>
           {subtitle && <p className="truncate text-xs text-muted">{subtitle}</p>}
@@ -46,9 +48,12 @@ export function AppShell({
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-10 flex items-center justify-between print:hidden border-b border-line bg-surface/90 px-4 py-3 backdrop-blur md:hidden">
-          <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <BrandMark variant="icon" className="h-8" />
+            <div className="min-w-0">
             <p className="truncate font-semibold">{title}</p>
             {subtitle && <p className="truncate text-xs text-muted">{subtitle}</p>}
+            </div>
           </div>
           <form action={logout}>
             <button aria-label="Salir" className="rounded-lg p-2 hover:bg-ink/5">

@@ -13,20 +13,25 @@
 }
 
 /*
- * Tokens de diseño (provisorios hasta definir branding).
- * Claro por defecto; oscuro según el sistema o forzado con <html data-theme="dark">.
+ * Tokens de diseño. Claro por defecto; oscuro según el sistema o forzado con <html data-theme="dark">.
  * Los degradados de imágenes usan `--bg`, así que en oscuro funden a negro y en claro a blanco.
+ *
+ * Dos paletas:
+ * - YATAY (paneles, login, landing): el verde del logo (#009375). En claro se usa uno apenas
+ *   más oscuro (#00806a) para que el texto verde sobre blanco se lea bien (contraste AA).
+ * - CARTA (páginas públicas de cada local, dentro de `.carta`): neutra y cálida, porque la carta
+ *   es del restaurante, no de Yatay.
  */
 :root {
-  /* ── MARCA: colores principales de la aplicación (claro). Oscuro: más abajo. ── */
-  --bg: #fbfaf7;
+  /* ── MARCA YATAY (claro). Oscuro: más abajo. ── */
+  --bg: #f6f9f8;
   --surface: #ffffff;
-  --ink: #1a1714;
-  --muted: #736b62;
-  --line: #e8e3dc;
-  --brand: #9a6b1f;
+  --ink: #14201c;
+  --muted: #66716d;
+  --line: #dde6e2;
+  --brand: #00806a;
   --brand-ink: #ffffff;
-  --brand-soft: #f6eedf;
+  --brand-soft: #e2f3ed;
   --ok: #15803d;
   --ok-soft: #dcfce7;
   --warn: #b45309;
@@ -38,14 +43,14 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0b0a09;
-    --surface: #171512;
-    --ink: #f5f2ed;
-    --muted: #a39b91;
-    --line: #2a2622;
-    --brand: #e2bd7a;
-    --brand-ink: #17130d;
-    --brand-soft: #2b2316;
+    --bg: #0a0f0d;
+    --surface: #121a17;
+    --ink: #eef4f1;
+    --muted: #93a49d;
+    --line: #22302b;
+    --brand: #3ccfa4;
+    --brand-ink: #04241b;
+    --brand-soft: #0f2a22;
     --ok: #4ade80;
     --ok-soft: #12291a;
     --warn: #fbbf24;
@@ -57,6 +62,49 @@
 }
 
 :root[data-theme="dark"] {
+  --bg: #0a0f0d;
+  --surface: #121a17;
+  --ink: #eef4f1;
+  --muted: #93a49d;
+  --line: #22302b;
+  --brand: #3ccfa4;
+  --brand-ink: #04241b;
+  --brand-soft: #0f2a22;
+  --ok: #4ade80;
+  --ok-soft: #12291a;
+  --warn: #fbbf24;
+  --warn-soft: #2d2410;
+  --danger: #f87171;
+  --danger-soft: #2f1414;
+  color-scheme: dark;
+}
+
+/* ── CARTA de cada local (claro). Más específico que :root, así que pisa a Yatay. ── */
+:root:has(.carta) {
+  --bg: #fbfaf7;
+  --surface: #ffffff;
+  --ink: #1a1714;
+  --muted: #736b62;
+  --line: #e8e3dc;
+  --brand: #9a6b1f;
+  --brand-ink: #ffffff;
+  --brand-soft: #f6eedf;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):has(.carta) {
+    --bg: #0b0a09;
+    --surface: #171512;
+    --ink: #f5f2ed;
+    --muted: #a39b91;
+    --line: #2a2622;
+    --brand: #e2bd7a;
+    --brand-ink: #17130d;
+    --brand-soft: #2b2316;
+  }
+}
+
+:root[data-theme="dark"]:has(.carta) {
   --bg: #0b0a09;
   --surface: #171512;
   --ink: #f5f2ed;
@@ -65,13 +113,6 @@
   --brand: #e2bd7a;
   --brand-ink: #17130d;
   --brand-soft: #2b2316;
-  --ok: #4ade80;
-  --ok-soft: #12291a;
-  --warn: #fbbf24;
-  --warn-soft: #2d2410;
-  --danger: #f87171;
-  --danger-soft: #2f1414;
-  color-scheme: dark;
 }
 
 @theme inline {

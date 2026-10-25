@@ -1,4 +1,5 @@
 import "server-only";
+import { billingState } from "@/lib/subscription";
 import { localParts } from "@/lib/booking";
 import { db } from "@/lib/db";
 import { planOf } from "@/lib/plans";
@@ -22,6 +23,7 @@ export async function tenantsOverview() {
         modules: true,
         memberships: { where: { role: "OWNER" }, include: { user: { select: { name: true, email: true } } } },
         _count: { select: { tables: { where: { archivedAt: null } }, products: true, memberships: { where: { active: true } } } },
+        subscription: true,
       },
     }),
     db.tableSession.groupBy({
@@ -47,6 +49,9 @@ export async function tenantsOverview() {
       active: t.active,
       createdAt: t.createdAt,
       region: regionOf(t.settings),
+      billing: billingState(t.subscription, now),
+      /** Precio mensual de la suscripción (centavos de su moneda; 0 = sin cargo o sin configurar). */
+      priceCents: t.subscription && !t.subscription.cancelledAt ? t.subscription.priceCents : 0,
       address: t.settings?.address ?? null,
       modules: t.modules.filter((m) => m.enabled && (!m.expiresAt || m.expiresAt.getTime() > now)).map((m) => m.module),
       expiring: t.modules.filter((m) => m.enabled && m.expiresAt && m.expiresAt.getTime() > now && m.expiresAt.getTime() < now + 14 * DAY),
@@ -116,6 +121,8 @@ export async function tenantDetail(id: string) {
       modules: { orderBy: { module: "asc" } },
       memberships: { include: { user: { select: { name: true, email: true } } }, orderBy: { createdAt: "asc" } },
       areas: { select: { id: true } },
+      subscription: true,
+      billingPayments: { orderBy: { periodTo: "desc" }, take: 24 },
     },
   });
   if (!tenant) return null;
@@ -132,6 +139,7 @@ export async function tenantDetail(id: string) {
   return {
     tenant,
     region: regionOf(tenant.settings),
+    billing: billingState(tenant.subscription, now),
     /** Módulos vigentes (activos y sin vencer) y los vencidos. */
     activeModules: tenant.modules.filter((m) => m.enabled && (!m.expiresAt || m.expiresAt.getTime() > now)).map((m) => m.module),
     expiredModules: tenant.modules.filter((m) => m.expiresAt && m.expiresAt.getTime() <= now).map((m) => m.module),
@@ -148,4 +156,12 @@ export async function tenantDetail(id: string) {
       lastSession: lastSession?.openedAt ?? null,
     },
   };
+}
+
+/** Cobros de la plataforma: lo cobrado este mes, por moneda. */
+export async function billingThisMonth() {
+  const now = new Date();
+  const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const rows = await db.billingPayment.groupBy({ by: ["currency"], where: { paidAt: { gte: from } }, _sum: { amountCents: true }, _count: { _all: true } });
+  return rows.map((r) => ({ currency: r.currency, cents: r._sum.amountCents ?? 0, count: r._count._all }));
 }

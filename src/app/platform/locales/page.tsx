@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/app-shell";
 import { ButtonLink } from "@/components/ui/button";
 import { Badge, Card } from "@/components/ui/card";
 import { requirePlatformAdmin } from "@/lib/auth/guards";
+import { BILLING_LABEL, BILLING_TONE } from "@/lib/subscription";
 import { normalize } from "@/lib/format";
 import { planOf } from "@/lib/plans";
 import { tenantsOverview } from "@/lib/platform";
@@ -25,7 +26,14 @@ export default async function LocalesPage({ searchParams }: PageProps<"/platform
     (t) =>
       (!q || normalize(`${t.name} ${t.slug} ${t.owners.map((o) => `${o.name} ${o.email}`).join(" ")}`).includes(normalize(q))) &&
       (!pais || t.region.country === pais) &&
-      (!estado || (estado === "activos" ? t.active : !t.active)),
+      (!estado ||
+        (estado === "activos"
+          ? t.active
+          : estado === "suspendidos"
+            ? !t.active
+            : estado === "vencidos"
+              ? t.billing.kind === "overdue"
+              : t.billing.kind === "trial")),
   );
 
   return (
@@ -63,6 +71,8 @@ export default async function LocalesPage({ searchParams }: PageProps<"/platform
           <option value="">Activos y suspendidos</option>
           <option value="activos">Solo activos</option>
           <option value="suspendidos">Solo suspendidos</option>
+          <option value="vencidos">Pago vencido</option>
+          <option value="prueba">En prueba</option>
         </select>
         <button className="h-10 rounded-xl bg-ink px-4 text-sm font-medium text-bg">Filtrar</button>
       </form>
@@ -81,6 +91,9 @@ export default async function LocalesPage({ searchParams }: PageProps<"/platform
                     <Badge>{COUNTRIES[t.region.country].label}</Badge>
                     <Badge tone="brand">{plan ? plan.label : `${t.modules.length} módulos`}</Badge>
                     {!t.active && <Badge tone="danger">Suspendido</Badge>}
+                    {t.active && t.billing.kind !== "free" && (
+                      <Badge tone={BILLING_TONE[t.billing.kind]}>{BILLING_LABEL[t.billing.kind]}</Badge>
+                    )}
                     {t.active && t.idle && <Badge tone="warn">Sin uso reciente</Badge>}
                   </div>
                   <p className="truncate text-sm text-muted">

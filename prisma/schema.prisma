@@ -58,6 +58,8 @@ model Tenant {
   notifications  Notification[]
   translations   Translation[]
   modifierGroups ModifierGroup[]
+  subscription   Subscription?
+  billingPayments BillingPayment[]
   cartItems      CartItem[]
   payments       Payment[]
   cashShifts     CashShift[]
@@ -892,4 +894,57 @@ model ChatInvite {
 
   @@index([toRoomId, status])
   @@index([fromRoomId, status])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Cobro del SaaS (lo que el local le paga a Yatay). Solo lo usa la plataforma.
+// Hoy los pagos se registran a mano; `provider`/`providerRef` quedan para Mercado Pago o Stripe.
+// ─────────────────────────────────────────────────────────────
+
+enum BillingProvider {
+  MANUAL
+  MERCADOPAGO
+  STRIPE
+}
+
+/// Suscripción de un local: precio mensual, prueba gratis y hasta cuándo está pago.
+/// El estado (prueba, al día, vencido, sin cargo) se calcula con estas fechas (src/lib/billing.ts).
+model Subscription {
+  id          String          @id @default(cuid())
+  tenantId    String          @unique
+  tenant      Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  /// Plan de referencia (src/lib/plans.ts); los módulos se manejan aparte.
+  planId      String?
+  /// Precio por mes en centavos de `currency`. 0 = sin cargo (demo, cortesía).
+  priceCents  Int             @default(0)
+  currency    String
+  trialEndsAt DateTime?
+  paidUntil   DateTime?
+  provider    BillingProvider @default(MANUAL)
+  providerRef String?
+  notes       String?
+  cancelledAt DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+/// Un pago recibido de un local. Extiende `paidUntil` de su suscripción.
+model BillingPayment {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  amountCents Int
+  currency    String
+  /// TRANSFERENCIA, EFECTIVO, MERCADOPAGO, STRIPE, OTRO
+  method      String
+  months      Int
+  periodFrom  DateTime
+  periodTo    DateTime
+  paidAt      DateTime
+  reference   String?
+  note        String?
+  recordedBy  String?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, paidAt])
 }

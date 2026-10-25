@@ -12,11 +12,13 @@ import { MODULES } from "@/lib/modules";
 import { PLANS, planOf } from "@/lib/plans";
 import { tenantDetail } from "@/lib/platform";
 import { COUNTRIES, formatMoney, isRoundCurrency } from "@/lib/region";
+import { todayISO } from "@/lib/subscription";
+import { BillingCard } from "./billing-card";
 import { applyPlan, setModuleExpiry, toggleModule, toggleTenantActive } from "../../actions";
 
 export const metadata: Metadata = { title: "Local" };
 
-/** Ficha de un local: datos, personal, módulos (con vencimiento), plan y uso del último mes. */
+/** Ficha de un local: suscripción y pagos, datos, personal, módulos (con vencimiento), plan y uso del último mes. */
 export default async function TenantPage({ params, searchParams }: PageProps<"/platform/locales/[id]">) {
   await requirePlatformAdmin();
   const { id } = await params;
@@ -151,6 +153,32 @@ export default async function TenantPage({ params, searchParams }: PageProps<"/p
         </Card>
 
         <div className="space-y-6">
+          <BillingCard
+            tenantId={t.id}
+            region={region}
+            state={detail.billing}
+            today={todayISO()}
+            sub={
+              t.subscription && {
+                planId: t.subscription.planId,
+                priceCents: t.subscription.priceCents,
+                trialEndsAt: t.subscription.trialEndsAt?.toISOString() ?? null,
+                paidUntil: t.subscription.paidUntil?.toISOString() ?? null,
+                notes: t.subscription.notes,
+                cancelled: !!t.subscription.cancelledAt,
+              }
+            }
+            payments={t.billingPayments.map((p) => ({
+              id: p.id,
+              amountCents: p.amountCents,
+              method: p.method,
+              months: p.months,
+              periodTo: p.periodTo.toISOString(),
+              paidAt: p.paidAt.toISOString(),
+              reference: p.reference,
+              recordedBy: p.recordedBy,
+            }))}
+          />
           <Card className="p-4">
             <h2 className="mb-2 font-semibold">Datos</h2>
             <dl className="space-y-1.5 text-sm">

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { ModuleKey } from "@/generated/prisma/enums";
 import { requirePlatformAdmin } from "@/lib/auth/guards";
 import { hashSecret } from "@/lib/auth/password";
+import { addMonths } from "@/lib/subscription";
 import { db } from "@/lib/db";
 import { PLANS } from "@/lib/plans";
 import { isCountry, regionSettingsFor } from "@/lib/region";
@@ -25,6 +26,7 @@ const schema = z.object({
   ownerPassword: z.string().min(8, "La contraseña inicial debe tener al menos 8 caracteres"),
   country: z.string().refine(isCountry, "País no válido"),
   plan: z.string().refine((v) => PLANS.some((p) => p.id === v), "Plan no válido"),
+  trialMonths: z.coerce.number().int().min(0).max(12),
 });
 
 export async function createTenant(_: CreateTenantState, formData: FormData): Promise<CreateTenantState> {
@@ -47,6 +49,14 @@ export async function createTenant(_: CreateTenantState, formData: FormData): Pr
         settings: { create: regionSettingsFor(d.country as "ES" | "AR") },
         // Módulos del plan elegido; se ajustan uno por uno desde la ficha del local.
         modules: { create: plan.modules.map((module) => ({ module })) },
+        // Suscripción con la prueba gratis elegida; el precio se carga desde la ficha del local.
+        subscription: {
+          create: {
+            planId: plan.id,
+            currency: regionSettingsFor(d.country as "ES" | "AR").currency,
+            trialEndsAt: d.trialMonths ? addMonths(new Date(), d.trialMonths) : null,
+          },
+        },
       },
     });
     const user = await tx.user.upsert({
