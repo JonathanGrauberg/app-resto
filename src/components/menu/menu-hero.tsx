@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ArrowDown, CalendarDays, Globe, MapPin } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowDown, CalendarDays, ChevronLeft, ChevronRight, Globe, MapPin } from "lucide-react";
 import type { MenuTheme } from "@/generated/prisma/enums";
 import { FadeOverlay, Photo } from "@/components/mock-image";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -62,6 +62,30 @@ export function MenuHero({
     const id = setTimeout(() => setActive((i) => (i + 1) % total), INTERVAL_MS);
     return () => clearTimeout(id);
   }, [active, paused, hovering, total]);
+
+  // Fila de categorías: flechas cuando hay más de las que entran, y la activa siempre a la vista.
+  const rowRef = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState({ left: false, right: false });
+  const measure = useCallback(() => {
+    const el = rowRef.current;
+    if (!el) return;
+    setEdges({ left: el.scrollLeft > 4, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 });
+  }, []);
+  useEffect(() => {
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [measure]);
+  useEffect(() => {
+    const row = rowRef.current;
+    const tile = row?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!row || !tile) return;
+    const pad = 48;
+    if (tile.offsetLeft - pad < row.scrollLeft) row.scrollTo({ left: tile.offsetLeft - pad, behavior: "smooth" });
+    else if (tile.offsetLeft + tile.offsetWidth + pad > row.scrollLeft + row.clientWidth)
+      row.scrollTo({ left: tile.offsetLeft + tile.offsetWidth + pad - row.clientWidth, behavior: "smooth" });
+  }, [active]);
+  const page = (dir: 1 | -1) => rowRef.current?.scrollBy({ left: dir * rowRef.current.clientWidth * 0.8, behavior: "smooth" });
 
   const showingCover = hasCover && active === 0;
   const current = showingCover ? null : slides[active - offset];
@@ -211,11 +235,14 @@ export function MenuHero({
           </div>
         )}
 
-        {/* Tiras de categorías */}
+        {/* Tiras de categorías: se deslizan con el dedo; en compu, con las flechas. */}
+        <div className="relative -mx-4 mt-7 sm:-mx-6 lg:-mx-10">
         <div
+          ref={rowRef}
+          onScroll={measure}
           role="tablist"
           aria-label="Categorías"
-          className="-mx-4 mt-7 flex snap-x gap-3 overflow-x-auto px-4 pb-1 pt-1 [scrollbar-width:none] sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10"
+          className="relative flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 pt-1 [scrollbar-width:none] sm:scroll-px-6 sm:px-6 lg:scroll-px-10 lg:px-10 [&::-webkit-scrollbar]:hidden"
         >
           {slides.map((s, i) => {
             const on = i + offset === active;
@@ -250,6 +277,28 @@ export function MenuHero({
               </button>
             );
           })}
+        </div>
+        {/* Bordes que avisan que hay más, y flechas (en celular alcanza con deslizar). */}
+        {edges.left && <div className="pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-bg to-transparent sm:w-16" />}
+        {edges.right && <div className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-bg to-transparent sm:w-16" />}
+        {edges.left && (
+          <button
+            onClick={() => page(-1)}
+            aria-label="Ver categorías anteriores"
+            className="absolute left-2 top-1/2 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full bg-bg/80 ring-1 ring-ink/15 backdrop-blur-md hover:bg-bg sm:flex lg:left-4"
+          >
+            <ChevronLeft className="size-5" aria-hidden />
+          </button>
+        )}
+        {edges.right && (
+          <button
+            onClick={() => page(1)}
+            aria-label="Ver más categorías"
+            className="absolute right-2 top-1/2 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full bg-bg/80 ring-1 ring-ink/15 backdrop-blur-md hover:bg-bg sm:flex lg:right-4"
+          >
+            <ChevronRight className="size-5" aria-hidden />
+          </button>
+        )}
         </div>
       </div>
     </section>
