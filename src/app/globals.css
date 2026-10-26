@@ -161,6 +161,17 @@ html {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Flechita que "empuja" hacia la derecha: hay más para deslizar (ver ScrollRow). */
+@keyframes nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(3px);
+  }
+}
+
 body {
   background: var(--bg);
   color: var(--ink);

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Filter, Search, X } from "lucide-react";
 import type { Allergen } from "@/generated/prisma/enums";
 import { Photo } from "@/components/mock-image";
+import { ScrollRow } from "@/components/scroll-row";
 import { ALLERGENS, ALLERGEN_KEYS } from "@/lib/allergens";
 import { cn } from "@/lib/format";
 import { useRegion } from "@/components/region-provider";
@@ -95,7 +96,7 @@ export function MenuBrowser({
           </button>
 
           {/* En PC las categorías van en la misma fila que el buscador */}
-          <CategoryChips cats={filtered} active={activeCat} className="ml-4 hidden flex-1 lg:flex" />
+          <CategoryChips cats={filtered} active={activeCat} className="ml-4 hidden flex-1 lg:block" />
         </div>
 
         {showFilters && (
@@ -131,7 +132,7 @@ export function MenuBrowser({
           </div>
         )}
 
-        <CategoryChips cats={filtered} active={activeCat} className="-mx-4 mt-2 flex px-4 sm:-mx-6 sm:px-6 lg:hidden" />
+        <CategoryChips cats={filtered} active={activeCat} className="-mx-4 mt-2 sm:-mx-6 lg:hidden" rowClassName="px-4 sm:px-6" />
       </div>
 
       {filtered.length === 0 && (
@@ -209,17 +210,20 @@ function CategoryChips({
   cats,
   active,
   className,
+  rowClassName,
 }: {
   cats: { id: string; name: string }[];
   active?: string;
   className?: string;
+  rowClassName?: string;
 }) {
   return (
-    <nav className={cn("gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]", className)} aria-label="Ir a categoría">
+    <ScrollRow className={className} rowClassName={cn("gap-1.5 pb-1", rowClassName)} activeKey={active} arrowClassName="size-8" label="Ir a categoría" role="navigation">
       {cats.map((c) => (
         <a
           key={c.id}
           href={`#cat-${c.id}`}
+          aria-current={active === c.id ? "true" : undefined}
           className={cn(
             "shrink-0 rounded-full px-3.5 py-1.5 text-sm transition-colors",
             active === c.id ? "bg-ink text-bg" : "bg-surface text-ink/80 ring-1 ring-line hover:ring-ink/30",
@@ -228,7 +232,7 @@ function CategoryChips({
           {c.name}
         </a>
       ))}
-    </nav>
+    </ScrollRow>
   );
 }
 
