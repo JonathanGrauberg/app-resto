@@ -6,7 +6,7 @@ import { cn } from "@/lib/format";
 
 /**
  * Fila que se desliza de costado (categorías, chips). Avisa que hay más:
- * bordes difuminados; en compu, flechas; en celular, una flechita que late hasta que la persona desliza.
+ * los bordes se desvanecen; en compu, flechas; en celular, una flechita que late hasta que la persona desliza.
  * Mantiene a la vista el elemento activo (`aria-current="true"` o `aria-selected="true"`) cuando cambia `activeKey`.
  */
 export function ScrollRow({
@@ -56,6 +56,12 @@ export function ScrollRow({
       row.scrollTo({ left: item.offsetLeft + item.offsetWidth + pad - row.clientWidth, behavior: "smooth" });
   }, [activeKey]);
 
+  // Los bordes se desvanecen con una máscara (no con un color encima): funciona sobre fotos o fondo liso.
+  const fadeW = "56px";
+  const mask =
+    edges.left || edges.right
+      ? `linear-gradient(to right, ${edges.left ? `transparent, #000 ${fadeW}` : "#000"}, ${edges.right ? `#000 calc(100% - ${fadeW}), transparent` : "#000"})`
+      : undefined;
   const page = (dir: 1 | -1) => rowRef.current?.scrollBy({ left: dir * rowRef.current.clientWidth * 0.8, behavior: "smooth" });
   const arrow = cn(
     "absolute top-1/2 hidden size-9 -translate-y-1/2 items-center justify-center rounded-full bg-bg/85 ring-1 ring-ink/15 backdrop-blur-md hover:bg-bg sm:flex",
@@ -73,11 +79,10 @@ export function ScrollRow({
           setTouched(true);
         }}
         className={cn("relative flex overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", rowClassName)}
+        style={{ maskImage: mask, WebkitMaskImage: mask }}
       >
         {children}
       </div>
-      {edges.left && <div className="pointer-events-none absolute inset-y-0 left-0 w-10 bg-gradient-to-r from-bg to-transparent sm:w-14" />}
-      {edges.right && <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-bg to-transparent sm:w-14" />}
       {edges.left && (
         <button type="button" onClick={() => page(-1)} aria-label="Ver anteriores" className={cn(arrow, "left-1")}>
           <ChevronLeft className="size-5" aria-hidden />
