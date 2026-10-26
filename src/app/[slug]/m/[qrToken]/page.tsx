@@ -2,8 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ReceiptText } from "lucide-react";
+import { LinksPage } from "@/components/links/links-page";
+import { QrIntro } from "@/components/links/qr-intro";
 import { MenuExperience } from "@/components/menu/menu-experience";
 import { MenuThemeScript } from "@/components/menu/menu-theme-script";
+import { isLinkTheme, readLinks } from "@/lib/links";
 import { getPublicMenu, getPublicTenant, toVenue } from "@/lib/public-menu";
 import { readDiner } from "@/lib/diner";
 import { hasModule } from "@/lib/modules";
@@ -26,13 +29,31 @@ export async function generateMetadata({ params }: PageProps<"/[slug]/m/[qrToken
  * Entrada por QR de mesa: carta + carrito compartido en vivo + pedidos + llamar al mozo.
  * El comensal se une a la mesa recién cuando agrega algo o llama al mozo (mirar la carta no abre la mesa).
  */
-export default async function TableEntryPage({ params }: PageProps<"/[slug]/m/[qrToken]">) {
+export default async function TableEntryPage({ params, searchParams }: PageProps<"/[slug]/m/[qrToken]">) {
   const { slug, qrToken } = await params;
   const tenant = await getPublicTenant(slug);
   if (!tenant) notFound();
 
   const ctx = await tableContext(slug, qrToken);
   if (!ctx || ctx.table.status === "DISABLED") notFound();
+
+  // Página de enlaces (si el local la activó): lo primero que se ve; "Ver la carta" entra a la mesa.
+  const s = tenant.settings;
+  if (s?.linksEnabled && (await searchParams).carta !== "1") {
+    return (
+      <>
+        <QrIntro slug={tenant.slug} />
+        <LinksPage
+          venue={{ name: tenant.name, tagline: s.tagline, logoUrl: s.logoUrl, coverImageUrl: s.coverImageUrl }}
+          links={readLinks(s)}
+          theme={isLinkTheme(s.linksTheme) ? s.linksTheme : "dark"}
+          cartaHref={`/${tenant.slug}/m/${qrToken}?carta=1`}
+          bookingHref={(await hasModule(tenant.id, "RESERVAS")) ? `/${tenant.slug}/reservar` : null}
+          country={s.country}
+        />
+      </>
+    );
+  }
 
   const [menu, diner] = await Promise.all([getPublicMenu(tenant.id), currentDiner(ctx)]);
   const state = diner ? await dinerTableState(ctx) : { cart: [], orders: [] };
@@ -56,6 +77,7 @@ export default async function TableEntryPage({ params }: PageProps<"/[slug]/m/[q
 
   return (
     <main className="flex-1 pb-24">
+      <QrIntro slug={tenant.slug} />
       <MenuThemeScript slug={tenant.slug} theme={tenant.settings?.menuTheme ?? "DARK"} />
       <MenuExperience
         venue={toVenue(tenant)}

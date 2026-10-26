@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
+  Link2,
   Armchair,
   BarChart3,
   Building2,
@@ -38,6 +39,7 @@ const ICONS = {
   compras: ShoppingCart,
   planes: Layers,
   muro: MessagesSquare,
+  enlaces: Link2,
 };
 
 export type NavIcon = keyof typeof ICONS;

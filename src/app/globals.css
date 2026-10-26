@@ -161,6 +161,78 @@ html {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Logo de Yatay que se arma (ver YatayLoader). */
+.yatay-loader .yl-circle,
+.yatay-loader .yl-trunk,
+.yatay-loader .yl-leaves,
+.yatay-loader .yl-letter {
+  transform-box: fill-box;
+}
+.yatay-loader .yl-circle {
+  transform-origin: center;
+  animation: yl-pop 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+}
+.yatay-loader .yl-trunk {
+  transform-origin: bottom center;
+  animation: yl-rise 0.5s 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.yatay-loader .yl-leaves {
+  transform-origin: 50% 55%;
+  animation:
+    yl-open 0.6s 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.2) both,
+    yl-breathe 2.4s 1.6s ease-in-out infinite;
+}
+.yatay-loader .yl-letter {
+  animation: yl-letter 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes yl-pop {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+@keyframes yl-rise {
+  from {
+    transform: translateY(30%) scaleY(0.4);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes yl-open {
+  from {
+    transform: scale(0.15) rotate(-12deg);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes yl-breathe {
+  0%,
+  100% {
+    transform: none;
+  }
+  50% {
+    transform: scale(1.04) rotate(1.5deg);
+  }
+}
+@keyframes yl-letter {
+  from {
+    transform: translateY(18px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
 /* Flechita que "empuja" hacia la derecha: hay más para deslizar (ver ScrollRow). */
 @keyframes nudge {
   0%,

@@ -92,6 +92,12 @@ model TenantSettings {
   facebookUrl     String?
   websiteUrl      String?
   googleReviewUrl String?
+  /// Página de enlaces (tipo Linktree) que se ve antes de la carta al escanear el QR de la mesa.
+  linksEnabled    Boolean   @default(false)
+  /// Fondo: "dark" | "green" | "cream" | "sand" | "cover" (la portada del local, oscurecida).
+  linksTheme      String    @default("dark")
+  /// Botones: [{ type, enabled, value?, label? }] en orden (ver src/lib/links.ts).
+  links           Json?
   /// País: define moneda, zona horaria, medios de pago y textos legales (ver src/lib/region.ts).
   country         String    @default("ES")
   currency        String    @default("EUR")
