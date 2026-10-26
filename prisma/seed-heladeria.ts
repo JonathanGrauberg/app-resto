@@ -141,7 +141,7 @@ async function main() {
           tagline: "Helado artesanal y café, frente al río",
           description: "Helado artesanal por bocha y por kilo, cafetería y algo salado. Demo de Yatay.",
           address: "Paraná, Entre Ríos",
-          menuTheme: "LIGHT",
+          menuTheme: "DARK",
           prepMode: "SEPARATE",
         },
       },

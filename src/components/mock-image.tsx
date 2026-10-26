@@ -75,11 +75,10 @@ export function FadedImage({
 }
 
 /**
- * Placeholder "fotográfico" mientras no hay subida de imágenes (R2).
- * El tono se deriva del `seed`: cada producto tiene siempre el mismo.
+ * Lugar de la foto mientras el local no subió una: siempre oscuro (en carta clara u oscura),
+ * con rayas diagonales finas y "Imagen próximamente". En recuadros chicos, solo un ícono.
  */
 export function MockImage({
-  seed,
   kind = "generic",
   label,
   fade = "none",
@@ -87,8 +86,9 @@ export function MockImage({
   hideIcon = false,
   className,
 }: {
-  seed: string;
-  /** Ocultar el ícono (fondos grandes con texto encima). */
+  /** Se mantiene por compatibilidad (antes daba el tono del placeholder). */
+  seed?: string;
+  /** Ocultar el ícono y el texto (fondos grandes con texto encima). */
   hideIcon?: boolean;
   kind?: keyof typeof icons;
   label?: string;
@@ -96,28 +96,29 @@ export function MockImage({
   to?: "bg" | "surface";
   className?: string;
 }) {
-  const n = [...seed].reduce((acc, ch) => (acc * 31 + ch.charCodeAt(0)) >>> 0, 7);
-  // Cocina: cálidos (rojos/ocres/verdes). Bar: ámbar, vino, azul noche.
-  const hues = kind === "bar" ? [28, 345, 210, 42] : [14, 32, 48, 95, 8];
-  const h = hues[n % hues.length];
-  const x = 35 + (n % 40);
-  const y = 30 + ((n >> 3) % 40);
   const Icon = icons[kind];
-
   return (
     <div
       role="img"
-      aria-label={label ?? "Imagen de ejemplo"}
-      className={cn("relative overflow-hidden", className)}
-      style={{
-        background: `radial-gradient(circle at ${x}% ${y}%, hsl(${h} 70% 58%) 0%, hsl(${h} 55% 34%) 32%, hsl(${(h + 20) % 360} 35% 14%) 75%, hsl(${h} 20% 8%) 100%)`,
-      }}
+      aria-label={label ? `${label} (sin foto)` : "Imagen próximamente"}
+      className={cn("@container relative overflow-hidden bg-[#141312]", className)}
+      style={{ backgroundImage: "repeating-linear-gradient(135deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 18px)" }}
     >
-      {!hideIcon && <Icon
-        className="absolute left-1/2 top-1/2 size-1/4 max-h-20 max-w-20 -translate-x-1/2 -translate-y-1/2 text-white/25"
-        strokeWidth={1.25}
-        aria-hidden
-      />}
+      {!hideIcon && (
+        <>
+          <div className="absolute inset-0 hidden place-items-center @[10rem]:grid">
+            <span className="flex flex-col items-center gap-2 bg-[#141312]/85 px-4 py-3 text-[10px] font-medium uppercase tracking-[0.35em] text-[#b8a07a]">
+              <span className="h-px w-6 bg-[#b8a07a]/60" aria-hidden />
+              Imagen próximamente
+            </span>
+          </div>
+          <Icon
+            className="absolute left-1/2 top-1/2 size-1/3 max-h-10 max-w-10 -translate-x-1/2 -translate-y-1/2 text-white/20 @[10rem]:hidden"
+            strokeWidth={1.25}
+            aria-hidden
+          />
+        </>
+      )}
       <FadeOverlay fade={fade} to={to} />
     </div>
   );

@@ -168,7 +168,7 @@ async function main() {
           address: "Paraná, Entre Ríos",
           phone: "343 611-2205",
           instagramUrl: "https://www.instagram.com/gunda.parana",
-          menuTheme: "LIGHT",
+          menuTheme: "DARK",
           prepMode: "SEPARATE",
         },
       },
