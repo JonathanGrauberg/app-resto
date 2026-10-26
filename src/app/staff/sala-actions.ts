@@ -7,7 +7,7 @@ import type { ActionState } from "@/lib/actions";
 import { requireTenantRole } from "@/lib/auth/guards";
 import { CAN_MANAGE_TABLES, hasRole } from "@/lib/auth/permissions";
 import { notifyStaff, notifyTable } from "@/lib/realtime/server";
-import { buildModifiers, unitPrice, type Modifier } from "@/lib/order-lines";
+import { buildModifiers, productGroups, unitPrice, type Modifier } from "@/lib/order-lines";
 import { getPrepMode, routeStations } from "@/lib/prep";
 import { computeBill } from "@/lib/billing";
 import { COUNTRIES, formatMoney, type PayMethod } from "@/lib/region";
@@ -620,7 +620,7 @@ export async function createStaffOrder(sessionId: string, lines: StaffOrderLine[
     if (!product.available) return err(`${product.name} está agotado`);
     const qty = Math.round(l.quantity);
     if (!(qty >= 1 && qty <= 50)) return err("Cantidad no válida");
-    const built = buildModifiers(product.modifierGroups.map((m) => m.group), l.optionIds ?? []);
+    const built = buildModifiers(productGroups(product.modifierGroups), l.optionIds ?? []);
     if ("error" in built) return err(`${product.name}: ${built.error}`);
     const who = (l.who ?? "").trim().slice(0, 20);
     items.push({

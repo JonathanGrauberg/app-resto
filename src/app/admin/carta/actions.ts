@@ -103,7 +103,7 @@ const optionSchema = z.object({
 });
 
 /** Campo oculto con una lista de opciones serializada como JSON. */
-function optionsJson(min: number, minMessage = "Agregá al menos una opción") {
+function optionsJson(min: number, minMessage = "Agregá al menos una opción", max = 20) {
   return z
     .string()
     .default("[]")
@@ -115,7 +115,7 @@ function optionsJson(min: number, minMessage = "Agregá al menos una opción") {
         return z.NEVER;
       }
     })
-    .pipe(z.array(optionSchema).min(min, minMessage).max(20, "Máximo 20 opciones"));
+    .pipe(z.array(optionSchema).min(min, minMessage).max(max, `Máximo ${max} opciones`));
 }
 
 const productSchemaFor = (region: Region) =>
@@ -162,6 +162,21 @@ export async function saveProduct(_: ActionState, formData: FormData): Promise<A
 
   const owned = await ownedIds(tdb, data.categoryId, modifierGroupIds);
   if (!owned.categoryOk) return { error: "Categoría no válida" };
+
+  // Cantidad propia de cada grupo en este producto (vacío = la del grupo).
+  const qty = new Map<string, { minSelect: number | null; maxSelect: number | null }>();
+  for (const g of owned.groupIds) {
+    const num = (k: string) => {
+      const v = String(formData.get(`${k}-${g}`) ?? "").trim();
+      return v === "" ? null : Number(v);
+    };
+    const min = num("qtyMin");
+    const max = num("qtyMax");
+    const bad = (n: number | null, lo: number) => n !== null && !(Number.isInteger(n) && n >= lo && n <= 10);
+    if (bad(min, 0) || bad(max, 1)) return { error: "Revisá las cantidades de las opciones", fieldErrors: { [`qty-${g}`]: "Entre 0 y 10" } };
+    if (min !== null && max !== null && min > max) return { error: "Revisá las cantidades de las opciones", fieldErrors: { [`qty-${g}`]: "El mínimo supera al máximo" } };
+    qty.set(g, { minSelect: min, maxSelect: max });
+  }
 
   // Imagen: se valida que la clave sea de este local y que el archivo exista en R2.
   const previous = id ? await tdb.product.findUnique({ where: { id }, select: { imageUrl: true } }) : null;
@@ -211,6 +226,7 @@ export async function saveProduct(_: ActionState, formData: FormData): Promise<A
     const links = [...owned.groupIds, ...(ownGroupId ? [ownGroupId] : [])].map((groupId, sortOrder) => ({
       groupId,
       sortOrder,
+      ...(qty.get(groupId) ?? {}),
     }));
     await tx.product.update({
       where: { id: productId },
@@ -267,11 +283,13 @@ const groupSchema = z
     name: z.string().trim().min(1, "Poné un nombre").max(40),
     minSelect: z.coerce.number().int().min(0).max(10),
     maxSelect: z.coerce.number().int().min(1).max(10),
-    options: optionsJson(1),
+    allowRepeat: checkbox,
+    // Hasta 60: una heladería puede tener muchos gustos.
+    options: optionsJson(1, undefined, 60),
   })
   .refine((g) => g.minSelect <= g.maxSelect, { message: "El mínimo no puede superar al máximo", path: ["minSelect"] })
-  .refine((g) => g.maxSelect <= g.options.length, {
-    message: "El máximo no puede superar la cantidad de opciones",
+  .refine((g) => g.allowRepeat || g.maxSelect <= g.options.length, {
+    message: "El máximo no puede superar la cantidad de opciones (o activá «se puede repetir»)",
     path: ["maxSelect"],
   });
 
@@ -280,7 +298,14 @@ export async function saveModifierGroup(_: ActionState, formData: FormData): Pro
   const parsed = groupSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return fail(parsed.error);
   const { id, options, ...data } = parsed.data;
-  const rows = options.map((o, sortOrder) => ({ name: o.name, extraPriceCents: o.extraPriceCents, sortOrder }));
+  // Las opciones se recrean al guardar: el "sin stock" se conserva por nombre.
+  const out = id ? await tdb.modifierOption.findMany({ where: { groupId: id, group: { tenantId: tenant.id }, available: false }, select: { name: true } }) : [];
+  const rows = options.map((o, sortOrder) => ({
+    name: o.name,
+    extraPriceCents: o.extraPriceCents,
+    sortOrder,
+    available: !out.some((x) => x.name.toLowerCase() === o.name.toLowerCase()),
+  }));
 
   if (id) {
     // Las opciones se reemplazan: los pedidos ya guardan copia del nombre y precio elegidos.
@@ -299,4 +324,57 @@ export async function deleteModifierGroup(id: string) {
   const { tdb, tenant } = await auth();
   await tdb.modifierGroup.delete({ where: { id } });
   refresh(tenant.slug);
+}
+
+/** Sin stock / de nuevo disponible (ej. se terminó el granizado). No borra la opción. */
+export async function toggleOptionAvailable(optionId: string) {
+  const { tdb, tenant } = await auth();
+  const o = await tdb.modifierOption.findFirst({ where: { id: optionId, group: { tenantId: tenant.id } } });
+  if (!o) throw new Error("Opción no encontrada");
+  await tdb.modifierOption.update({ where: { id: optionId }, data: { available: !o.available } });
+  refresh(tenant.slug);
+}
+
+/** Gustos de helado más comunes, para no cargarlos uno por uno. */
+const FLAVORS = [
+  "Chocolate",
+  "Chocolate amargo",
+  "Chocolate con almendras",
+  "Dulce de leche",
+  "Dulce de leche granizado",
+  "Super dulce de leche",
+  "Crema americana",
+  "Vainilla",
+  "Granizado",
+  "Sambayón",
+  "Tramontana",
+  "Crema del cielo",
+  "Frutilla a la crema",
+  "Frutilla al agua",
+  "Limón",
+  "Durazno",
+  "Banana split",
+  "Menta granizada",
+  "Mascarpone con frutos rojos",
+  "Pistacho",
+];
+
+/** Crea el grupo "Gustos" con los clásicos: se puede repetir, de 1 a 3 (cada producto ajusta su cantidad). */
+export async function createFlavorsGroup() {
+  const { tdb, tenant } = await auth();
+  const existing = await tdb.modifierGroup.findFirst({ where: { ownerProductId: null, name: { equals: "Gustos", mode: "insensitive" } } });
+  if (!existing) {
+    await tdb.modifierGroup.create({
+      data: {
+        tenantId: tenant.id,
+        name: "Gustos",
+        minSelect: 1,
+        maxSelect: 3,
+        allowRepeat: true,
+        options: { create: FLAVORS.map((name, sortOrder) => ({ name, sortOrder })) },
+      },
+    });
+  }
+  refresh(tenant.slug);
+  redirect(`/admin/carta/modificadores?ok=${encodeURIComponent(existing ? "Ya tenés un grupo «Gustos»" : "Lista de gustos creada: editala a tu gusto")}`);
 }

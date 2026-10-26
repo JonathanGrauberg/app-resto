@@ -1,6 +1,7 @@
 import "server-only";
 import { expireReservations, getBookingConfig } from "@/lib/booking";
 import type { TenantDb } from "@/lib/tenant-db";
+import { modifierLabels } from "@/lib/format";
 
 /** Estado completo de la sala para la vista en vivo (mozo / caja). Serializable. */
 export async function getSalaData(tdb: TenantDb, tenantId: string) {
@@ -93,7 +94,7 @@ export async function getSalaData(tdb: TenantDb, tenantId: string) {
           name: i.name,
           quantity: i.quantity,
           unitPriceCents: i.unitPriceCents,
-          modifiers: ((i.modifiers as { name: string }[]) ?? []).map((m) => m.name),
+          modifiers: modifierLabels(i.modifiers as { name: string }[]),
           notes: i.notes,
           addedBy: i.addedBy,
           addedById: i.addedById,

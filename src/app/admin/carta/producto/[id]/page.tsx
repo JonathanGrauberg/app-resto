@@ -51,6 +51,9 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
         station: product.station,
         allergens: product.allergens,
         modifierGroupIds: product.modifierGroups.map((m) => m.groupId).filter((g) => g !== product.ownGroup?.id),
+        groupQty: Object.fromEntries(
+          product.modifierGroups.map((m) => [m.groupId, { min: m.minSelect?.toString() ?? "", max: m.maxSelect?.toString() ?? "" }]),
+        ),
         ownExtras: product.ownGroup?.options.map((o) => ({ name: o.name, extraPriceCents: o.extraPriceCents })) ?? [],
         tags: product.tags.join(", "),
         available: product.available,
@@ -97,6 +100,9 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
         groups={groups.map((g) => ({
           id: g.id,
           name: g.name,
+          minSelect: g.minSelect,
+          maxSelect: g.maxSelect,
+          allowRepeat: g.allowRepeat,
           summary: g.options
             .map((o) => (o.extraPriceCents ? `${o.name} (+${formatPrice(o.extraPriceCents)})` : o.name))
             .join(", "),

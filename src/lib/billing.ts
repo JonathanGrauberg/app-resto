@@ -1,5 +1,6 @@
 import "server-only";
 import type { TenantDb } from "@/lib/tenant-db";
+import { modifierLabels } from "@/lib/format";
 
 /**
  * La cuenta de una mesa, calculada siempre en el servidor y en céntimos:
@@ -27,7 +28,7 @@ export async function computeBill(tdb: TenantDb, sessionId: string) {
       quantity: i.quantity,
       unitCents: i.unitPriceCents,
       lineCents: i.unitPriceCents * i.quantity,
-      modifiers: ((i.modifiers as { name: string }[]) ?? []).map((m) => m.name),
+      modifiers: modifierLabels(i.modifiers as { name: string }[]),
       addedBy: i.addedBy,
       comped: i.comped,
       compReason: i.compReason,

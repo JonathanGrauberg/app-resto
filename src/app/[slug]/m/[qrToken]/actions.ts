@@ -6,7 +6,7 @@ import { z } from "zod";
 import type { ActionState } from "@/lib/actions";
 import { defaultNickname, newDinerId, readDiner, setDinerCookie } from "@/lib/diner";
 import { hasModule } from "@/lib/modules";
-import { buildModifiers, unitPrice } from "@/lib/order-lines";
+import { buildModifiers, productGroups, unitPrice } from "@/lib/order-lines";
 import { notifyStaff, notifyTable } from "@/lib/realtime/server";
 import { currentDiner, tableContext, type TableContext } from "@/lib/table-session";
 
@@ -123,7 +123,7 @@ export async function addToCart(slug: string, qrToken: string, input: z.input<ty
   if (!product.available) return err(`${product.name} está agotado`);
 
   // Validar opciones: deben ser de los grupos del plato y respetar mínimos/máximos.
-  const built = buildModifiers(product.modifierGroups.map((m) => m.group), optionIds);
+  const built = buildModifiers(productGroups(product.modifierGroups), optionIds);
   if ("error" in built) return err(built.error);
   const { modifiers } = built;
 

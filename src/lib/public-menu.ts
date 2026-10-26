@@ -66,12 +66,14 @@ export async function getPublicMenu(tenantId: string) {
         allergens: p.allergens,
         tags: p.tags,
         available: p.available,
-        modifierGroups: p.modifierGroups.map(({ group }) => ({
+        // Cantidad propia del producto si la tiene (ej. "Gustos": ¼ kg hasta 3, 1 kg hasta 4).
+        modifierGroups: p.modifierGroups.map(({ group, minSelect, maxSelect }) => ({
           id: group.id,
           name: group.name,
-          minSelect: group.minSelect,
-          maxSelect: group.maxSelect,
-          options: group.options.map((o) => ({ id: o.id, name: o.name, extraPriceCents: o.extraPriceCents })),
+          minSelect: minSelect ?? group.minSelect,
+          maxSelect: maxSelect ?? group.maxSelect,
+          allowRepeat: group.allowRepeat,
+          options: group.options.map((o) => ({ id: o.id, name: o.name, extraPriceCents: o.extraPriceCents, available: o.available })),
         })),
       })),
     }));

@@ -29,6 +29,8 @@ export type ProductValues = {
   tags: string;
   available: boolean;
   visible: boolean;
+  /** Cantidad propia por grupo compartido ("" = la del grupo). */
+  groupQty?: Record<string, { min: string; max: string }>;
 };
 
 const STATIONS: { value: PrepStation; label: string; hint: string }[] = [
@@ -46,7 +48,7 @@ export function ProductForm({
   singleScreen?: boolean;
   values: ProductValues;
   categories: { id: string; name: string }[];
-  groups: { id: string; name: string; summary: string }[];
+  groups: { id: string; name: string; summary: string; minSelect: number; maxSelect: number; allowRepeat: boolean }[];
 }) {
   const { formatPrice, parsePrice, symbol, country } = useRegion();
   const [state, action, pending] = useFormAction(saveProduct, undefined);
@@ -155,22 +157,50 @@ export function ProductForm({
           ) : (
             <div className="grid gap-2 sm:grid-cols-2">
               {groups.map((g) => (
-                <label
+                <div
                   key={g.id}
-                  className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-3 has-[:checked]:border-brand has-[:checked]:bg-brand-soft"
+                  className="group/g rounded-xl border border-line p-3 has-[input[name=modifierGroupIds]:checked]:border-brand has-[input[name=modifierGroupIds]:checked]:bg-brand-soft"
                 >
-                  <input
-                    type="checkbox"
-                    name="modifierGroupIds"
-                    value={g.id}
-                    defaultChecked={values.modifierGroupIds.includes(g.id)}
-                    className="mt-0.5 size-4 accent-[var(--brand)]"
-                  />
-                  <span>
-                    <span className="block text-sm font-medium">{g.name}</span>
-                    <span className="block text-xs text-muted">{g.summary}</span>
-                  </span>
-                </label>
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <input
+                      type="checkbox"
+                      name="modifierGroupIds"
+                      value={g.id}
+                      defaultChecked={values.modifierGroupIds.includes(g.id)}
+                      className="mt-0.5 size-4 accent-[var(--brand)]"
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium">{g.name}</span>
+                      <span className="line-clamp-2 block text-xs text-muted">{g.summary}</span>
+                    </span>
+                  </label>
+                  {/* Cuántas se eligen en ESTE producto (ej. ¼ kg: de 1 a 3 gustos). Vacío = lo del grupo. */}
+                  <div className="mt-2 hidden items-center gap-1.5 pl-7 text-xs group-has-[input[name=modifierGroupIds]:checked]/g:flex">
+                    <span className="text-muted">En este producto, de</span>
+                    <input
+                      name={`qtyMin-${g.id}`}
+                      type="number"
+                      min={0}
+                      max={10}
+                      defaultValue={values.groupQty?.[g.id]?.min ?? ""}
+                      placeholder={String(g.minSelect)}
+                      aria-label={`Mínimo de ${g.name} en este producto`}
+                      className="h-8 w-14 rounded-lg border border-line bg-surface px-2 text-sm"
+                    />
+                    <span className="text-muted">a</span>
+                    <input
+                      name={`qtyMax-${g.id}`}
+                      type="number"
+                      min={1}
+                      max={10}
+                      defaultValue={values.groupQty?.[g.id]?.max ?? ""}
+                      placeholder={String(g.maxSelect)}
+                      aria-label={`Máximo de ${g.name} en este producto`}
+                      className="h-8 w-14 rounded-lg border border-line bg-surface px-2 text-sm"
+                    />
+                    {fe[`qty-${g.id}`] && <span className="text-danger">{fe[`qty-${g.id}`]}</span>}
+                  </div>
+                </div>
               ))}
             </div>
           )}

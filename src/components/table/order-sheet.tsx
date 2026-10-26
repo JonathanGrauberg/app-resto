@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { Minus, Plus, Send, X } from "lucide-react";
 import { Photo } from "@/components/mock-image";
-import { cn } from "@/lib/format";
+import { cn, modifierLabels } from "@/lib/format";
 import { itemPhase, PHASE_LABEL } from "@/lib/item-status";
 import { groupByPerson, joinNames } from "@/lib/people";
 import type { DinerTableState } from "@/lib/table-session";
@@ -104,7 +104,7 @@ export function OrderSheet({ onClose }: { onClose: () => void }) {
                             <span className={cn("min-w-0 flex-1", (i.phase === "rejected" || i.phase === "cancelled") && "text-muted line-through")}>
                               {i.name}
                               {i.modifiers.length > 0 && (
-                                <span className="block text-xs text-muted no-underline">{i.modifiers.map((m) => m.name).join(", ")}</span>
+                                <span className="block text-xs text-muted no-underline">{modifierLabels(i.modifiers).join(", ")}</span>
                               )}
                               {i.phase === "rejected" && i.rejectReason && (
                                 <span className="block text-xs text-danger">{i.rejectReason}</span>
@@ -158,7 +158,7 @@ function CartRow({ item }: { item: CartItem }) {
       <Photo src={item.imageUrl} seed={item.productId} fade="right" to="surface" className="size-12 shrink-0 rounded-xl" />
       <div className="min-w-0 flex-1">
         <p className="font-medium leading-tight">{item.name}</p>
-        {item.modifiers.length > 0 && <p className="text-xs text-muted">{item.modifiers.map((m) => m.name).join(", ")}</p>}
+        {item.modifiers.length > 0 && <p className="text-xs text-muted">{modifierLabels(item.modifiers).join(", ")}</p>}
         {item.notes && <p className="text-xs italic text-muted">“{item.notes}”</p>}
         {!item.available && <p className="text-xs font-medium text-danger">Se agotó: quitalo para enviar</p>}
       </div>

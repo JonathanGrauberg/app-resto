@@ -11,6 +11,7 @@ import { cn } from "@/lib/format";
 import { useRegion } from "@/components/region-provider";
 import type { PublicProduct } from "@/lib/public-menu";
 import { CloseButton } from "./menu-browser";
+import { groupHint, useOptionSelection } from "./use-options";
 
 /**
  * Ficha de producto. En celular es una hoja inferior; en pantallas grandes, un diálogo centrado.
@@ -20,7 +21,7 @@ export function ProductSheet({ product: p, onClose }: { product: PublicProduct; 
   const { formatPrice } = useRegion();
   const table = useTable();
   const [qty, setQty] = useState(1);
-  const [selected, setSelected] = useState<Record<string, string[]>>({});
+  const opts = useOptionSelection(p.modifierGroups);
   const [notes, setNotes] = useState("");
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +42,7 @@ export function ProductSheet({ product: p, onClose }: { product: PublicProduct; 
     if (!table) return;
     setAdding(true);
     setError(null);
-    const res = await table.add({ productId: p.id, quantity: qty, optionIds: Object.values(selected).flat(), notes });
+    const res = await table.add({ productId: p.id, quantity: qty, optionIds: opts.optionIds, notes });
     setAdding(false);
     if (res.ok) {
       table.toast(qty > 1 ? `${qty}× ${p.name} al pedido` : `${p.name} al pedido`);
@@ -61,20 +62,8 @@ export function ProductSheet({ product: p, onClose }: { product: PublicProduct; 
     };
   }, [onClose]);
 
-  const toggle = (groupId: string, optionId: string, max: number) =>
-    setSelected((prev) => {
-      const cur = prev[groupId] ?? [];
-      if (cur.includes(optionId)) return { ...prev, [groupId]: cur.filter((o) => o !== optionId) };
-      if (max === 1) return { ...prev, [groupId]: [optionId] };
-      if (cur.length >= max) return prev;
-      return { ...prev, [groupId]: [...cur, optionId] };
-    });
-
-  const extras = p.modifierGroups.flatMap((g) =>
-    g.options.filter((o) => selected[g.id]?.includes(o.id)).map((o) => o.extraPriceCents),
-  );
-  const unit = p.priceCents + extras.reduce((a, b) => a + b, 0);
-  const missingRequired = p.modifierGroups.some((g) => (selected[g.id]?.length ?? 0) < g.minSelect);
+  const unit = p.priceCents + opts.extrasCents;
+  const missingRequired = opts.missing;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-6"  role="dialog" aria-modal aria-label={p.name}>
@@ -128,37 +117,63 @@ export function ProductSheet({ product: p, onClose }: { product: PublicProduct; 
               <p className="text-sm text-muted">Sin alérgenos declarados.</p>
             )}
 
-            {p.modifierGroups.map((g) => (
-              <fieldset key={g.id}>
-                <legend className="mb-1.5 flex w-full items-center justify-between text-sm font-medium">
-                  {g.name}
-                  <span className="text-xs font-normal text-muted">
-                    {g.minSelect > 0 ? "Obligatorio" : "Opcional"}
-                    {g.maxSelect > 1 ? ` · hasta ${g.maxSelect}` : ""}
-                  </span>
-                </legend>
-                <div className="divide-y divide-line rounded-xl border border-line">
-                  {g.options.map((o) => {
-                    const checked = selected[g.id]?.includes(o.id) ?? false;
-                    return (
-                      <label key={o.id} className="flex cursor-pointer items-center gap-3 px-3 py-3">
-                        <input
-                          type={g.maxSelect === 1 ? "radio" : "checkbox"}
-                          name={g.id}
-                          checked={checked}
-                          onChange={() => toggle(g.id, o.id, g.maxSelect)}
-                          className="size-5 accent-[var(--color-brand)]"
-                        />
-                        <span className="flex-1">{o.name}</span>
-                        {o.extraPriceCents > 0 && (
-                          <span className="text-sm text-muted">+{formatPrice(o.extraPriceCents)}</span>
-                        )}
-                      </label>
-                    );
-                  })}
-                </div>
-              </fieldset>
-            ))}
+            {p.modifierGroups.map((g) => {
+              const picked = opts.chosen(g).length;
+              const full = picked >= g.maxSelect;
+              return (
+                <fieldset key={g.id}>
+                  <legend className="mb-1.5 flex w-full items-center justify-between gap-2 text-sm font-medium">
+                    {g.name}
+                    <span className="text-xs font-normal text-muted">{groupHint(g, picked)}</span>
+                  </legend>
+                  <div className="divide-y divide-line rounded-xl border border-line">
+                    {g.options.map((o) => {
+                      const n = opts.times(g, o.id);
+                      const price = o.extraPriceCents > 0 && <span className="text-sm text-muted">+{formatPrice(o.extraPriceCents)}</span>;
+                      if (!o.available) {
+                        return (
+                          <div key={o.id} className="flex items-center gap-3 px-3 py-3 text-muted">
+                            <span className="flex-1 line-through">{o.name}</span>
+                            <span className="text-xs">Sin stock</span>
+                          </div>
+                        );
+                      }
+                      // Se puede repetir (bochas): contador por opción.
+                      if (g.allowRepeat && g.maxSelect > 1) {
+                        return (
+                          <div key={o.id} className={cn("flex items-center gap-3 px-3 py-2", n > 0 && "bg-brand-soft/60")}>
+                            <span className="flex-1">{o.name}</span>
+                            {price}
+                            <div className="flex items-center rounded-full border border-line bg-surface">
+                              <button type="button" onClick={() => opts.remove(g, o.id)} disabled={n === 0} className="p-2 disabled:opacity-30" aria-label={`Una menos de ${o.name}`}>
+                                <Minus className="size-4" aria-hidden />
+                              </button>
+                              <span className="w-5 text-center text-sm font-semibold tabular-nums" aria-live="polite">{n}</span>
+                              <button type="button" onClick={() => opts.add(g, o.id)} disabled={full} className="p-2 disabled:opacity-30" aria-label={`Una más de ${o.name}`}>
+                                <Plus className="size-4" aria-hidden />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return (
+                        <label key={o.id} className={cn("flex cursor-pointer items-center gap-3 px-3 py-3", full && n === 0 && g.maxSelect > 1 && "opacity-50")}>
+                          <input
+                            type={g.maxSelect === 1 ? "radio" : "checkbox"}
+                            name={g.id}
+                            checked={n > 0}
+                            onChange={() => opts.toggle(g, o.id)}
+                            className="size-5 accent-[var(--color-brand)]"
+                          />
+                          <span className="flex-1">{o.name}</span>
+                          {price}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              );
+            })}
 
             {(alreadyOrdered.length > 0 || inCart.length > 0) && (
               <div className="flex gap-2.5 rounded-xl border border-brand/40 bg-brand-soft p-3 text-sm">

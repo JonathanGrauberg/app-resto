@@ -2,6 +2,7 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
 import type { TenantDb } from "@/lib/tenant-db";
+import { modifierLabels } from "@/lib/format";
 
 /**
  * La cuenta de una mesa (documento informativo, NO es factura).
@@ -49,7 +50,7 @@ function build(s: LoadedSession, tenant: { name: string; slug: string }, setting
     round: o.round,
     at: o.createdAt.toISOString(),
     items: o.items.map((i) => {
-      const mods = ((i.modifiers as { name: string }[]) ?? []).map((m) => m.name);
+      const mods = modifierLabels(i.modifiers as { name: string }[]);
       return {
         id: i.id,
         name: i.name,

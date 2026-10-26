@@ -1,6 +1,7 @@
 import "server-only";
 import type { PrepStation } from "@/generated/prisma/enums";
 import type { TenantDb } from "@/lib/tenant-db";
+import { modifierLabels } from "@/lib/format";
 
 /**
  * Pantalla de cocina / bar (KDS): pedidos ya aceptados por el mozo, de una estación,
@@ -52,7 +53,7 @@ export async function getKdsData(tdb: TenantDb, stations: PrepStation[]) {
       id: i.id,
       name: i.name,
       quantity: i.quantity,
-      modifiers: ((i.modifiers as { name: string }[]) ?? []).map((m) => m.name),
+      modifiers: modifierLabels(i.modifiers as { name: string }[]),
       notes: i.notes,
       addedBy: i.addedBy,
       status: i.status as "PENDING" | "IN_PREPARATION" | "READY",

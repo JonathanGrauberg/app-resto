@@ -3,11 +3,18 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeft, Minus, Plus, Search, Send, X } from "lucide-react";
-import { cn } from "@/lib/format";
+import { cn, modifierLabels } from "@/lib/format";
+import { groupHint, useOptionSelection } from "@/components/menu/use-options";
 import { useRegion } from "@/components/region-provider";
 import type { PublicMenu, PublicProduct } from "@/lib/public-menu";
 import { matchesQuery } from "@/lib/search";
 import { createStaffOrder } from "@/app/staff/sala-actions";
+
+/** Opciones elegidas de una línea, una por vez que se eligió (2 bochas de chocolate = 2). */
+const chosenOptions = (l: Line) => {
+  const all = l.product.modifierGroups.flatMap((g) => g.options);
+  return l.optionIds.flatMap((id) => all.filter((o) => o.id === id));
+};
 
 type Line = {
   key: string;
@@ -73,7 +80,7 @@ export function StaffOrderComposer({
 
   const unitOf = (l: Line) =>
     l.product.priceCents +
-    l.product.modifierGroups.flatMap((g) => g.options).filter((o) => l.optionIds.includes(o.id)).reduce((n, o) => n + o.extraPriceCents, 0);
+    chosenOptions(l).reduce((n, o) => n + o.extraPriceCents, 0);
   const total = lines.reduce((n, l) => n + unitOf(l) * l.quantity, 0);
   const count = lines.reduce((n, l) => n + l.quantity, 0);
 
@@ -156,7 +163,7 @@ export function StaffOrderComposer({
                     <p className="font-medium leading-tight">{l.product.name}</p>
                     {l.optionIds.length > 0 && (
                       <p className="text-xs text-muted">
-                        {l.product.modifierGroups.flatMap((g) => g.options).filter((o) => l.optionIds.includes(o.id)).map((o) => o.name).join(", ")}
+                        {modifierLabels(chosenOptions(l)).join(", ")}
                       </p>
                     )}
                     <p className="text-xs text-muted">{l.who || "Mesa"}</p>
@@ -328,18 +335,9 @@ function OptionsPicker({
   onAdd: (optionIds: string[], notes: string) => void;
 }) {
   const { formatPrice } = useRegion();
-  const [selected, setSelected] = useState<Record<string, string[]>>({});
+  const opts = useOptionSelection(p.modifierGroups);
   const [notes, setNotes] = useState("");
-  const missing = p.modifierGroups.some((g) => (selected[g.id]?.length ?? 0) < g.minSelect);
-
-  const toggle = (groupId: string, optionId: string, max: number) =>
-    setSelected((prev) => {
-      const cur = prev[groupId] ?? [];
-      if (cur.includes(optionId)) return { ...prev, [groupId]: cur.filter((o) => o !== optionId) };
-      if (max === 1) return { ...prev, [groupId]: [optionId] };
-      if (cur.length >= max) return prev;
-      return { ...prev, [groupId]: [...cur, optionId] };
-    });
+  const missing = opts.missing;
 
   return (
     <div className="absolute inset-0 z-10 flex flex-col bg-surface">
@@ -351,36 +349,49 @@ function OptionsPicker({
         <p className="font-semibold tabular-nums">{formatPrice(p.priceCents)}</p>
       </header>
       <div className="flex-1 space-y-5 overflow-y-auto p-4">
-        {p.modifierGroups.map((g) => (
-          <fieldset key={g.id}>
-            <legend className="mb-2 flex w-full justify-between text-sm font-medium">
-              {g.name}
-              <span className="text-xs font-normal text-muted">
-                {g.minSelect > 0 ? "Obligatorio" : "Opcional"}
-                {g.maxSelect > 1 ? ` · hasta ${g.maxSelect}` : ""}
-              </span>
-            </legend>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {g.options.map((o) => {
-                const on = selected[g.id]?.includes(o.id) ?? false;
-                return (
-                  <button
-                    key={o.id}
-                    onClick={() => toggle(g.id, o.id, g.maxSelect)}
-                    aria-pressed={on}
-                    className={cn(
-                      "flex items-center justify-between rounded-xl border px-3 py-3 text-left",
-                      on ? "border-brand bg-brand-soft" : "border-line",
-                    )}
-                  >
-                    <span>{o.name}</span>
-                    {o.extraPriceCents > 0 && <span className="text-sm text-muted">+{formatPrice(o.extraPriceCents)}</span>}
-                  </button>
-                );
-              })}
-            </div>
-          </fieldset>
-        ))}
+        {p.modifierGroups.map((g) => {
+          const picked = opts.chosen(g).length;
+          const full = picked >= g.maxSelect;
+          const repeat = g.allowRepeat && g.maxSelect > 1;
+          return (
+            <fieldset key={g.id}>
+              <legend className="mb-2 flex w-full justify-between gap-2 text-sm font-medium">
+                {g.name}
+                <span className="text-xs font-normal text-muted">{groupHint(g, picked)}</span>
+              </legend>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {g.options.map((o) => {
+                  const n = opts.times(g, o.id);
+                  return (
+                    <div key={o.id} className={cn("flex items-stretch overflow-hidden rounded-xl border", n > 0 ? "border-brand bg-brand-soft" : "border-line", !o.available && "opacity-50")}>
+                      <button
+                        onClick={() => (repeat ? opts.add(g, o.id) : opts.toggle(g, o.id))}
+                        disabled={!o.available || (repeat && full)}
+                        aria-pressed={n > 0}
+                        className="flex flex-1 items-center justify-between gap-2 px-3 py-3 text-left"
+                      >
+                        <span className={cn(!o.available && "line-through")}>
+                          {o.name}
+                          {repeat && n > 0 && <strong className="ml-1.5 tabular-nums">×{n}</strong>}
+                        </span>
+                        {!o.available ? (
+                          <span className="text-xs">Sin stock</span>
+                        ) : (
+                          o.extraPriceCents > 0 && <span className="text-sm text-muted">+{formatPrice(o.extraPriceCents)}</span>
+                        )}
+                      </button>
+                      {repeat && n > 0 && (
+                        <button onClick={() => opts.remove(g, o.id)} aria-label={`Una menos de ${o.name}`} className="border-l border-brand/30 px-3 hover:bg-ink/5">
+                          <Minus className="size-4" aria-hidden />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </fieldset>
+          );
+        })}
         <input
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
@@ -392,7 +403,7 @@ function OptionsPicker({
       </div>
       <div className="border-t border-line p-4">
         <button
-          onClick={() => onAdd(Object.values(selected).flat(), notes.trim())}
+          onClick={() => onAdd(opts.optionIds, notes.trim())}
           disabled={missing}
           className="h-12 w-full rounded-xl bg-brand font-semibold text-brand-ink disabled:opacity-50"
         >

@@ -399,6 +399,8 @@ model ModifierGroup {
   name           String
   minSelect      Int      @default(0)
   maxSelect      Int      @default(1)
+  /// Se puede elegir la misma opción más de una vez (ej. 2 bochas de chocolate).
+  allowRepeat    Boolean  @default(false)
   ownerProductId String?  @unique
   ownerProduct   Product? @relation("ProductOwnGroup", fields: [ownerProductId], references: [id], onDelete: Cascade)
 
@@ -415,6 +417,8 @@ model ModifierOption {
   name            String
   extraPriceCents Int           @default(0)
   sortOrder       Int           @default(0)
+  /// false = sin stock por ahora (se ve en la carta pero no se puede elegir).
+  available       Boolean       @default(true)
 }
 
 model ProductModifierGroup {
@@ -423,6 +427,9 @@ model ProductModifierGroup {
   groupId   String
   group     ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   sortOrder Int           @default(0)
+  /// Cuántas opciones se eligen en ESTE producto (null = lo del grupo). Ej. "Gustos": ¼ kg hasta 3, 1 kg hasta 4.
+  minSelect Int?
+  maxSelect Int?
 
   @@id([productId, groupId])
 }

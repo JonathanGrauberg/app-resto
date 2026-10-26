@@ -16,6 +16,7 @@ export type GroupValues = {
   name: string;
   minSelect: number;
   maxSelect: number;
+  allowRepeat?: boolean;
   options: { name: string; extraPriceCents: number }[];
   usedBy?: number;
 };
@@ -71,6 +72,14 @@ export function ModifierGroupForm({ values }: { values: GroupValues }) {
             <Input id={`max-${values.id ?? "new"}`} name="maxSelect" type="number" min={1} max={10} defaultValue={values.maxSelect} />
           </Field>
         </div>
+
+        <label className="flex items-start gap-3 text-sm">
+          <input type="checkbox" name="allowRepeat" defaultChecked={values.allowRepeat} className="mt-0.5 size-4 accent-[var(--brand)]" />
+          <span>
+            <span className="font-medium">Se puede repetir una opción</span>
+            <span className="block text-xs text-muted">Ej. gustos de helado: 2 bochas de chocolate. Cada producto puede tener su propia cantidad.</span>
+          </span>
+        </label>
 
         <div>
           <p className="mb-1.5 text-sm font-medium">Opciones</p>
