@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { TornEdge } from "./torn-edge";
 
 /**
  * Historia de la landing que avanza con el scroll (ilustración 2D en SVG, fija mientras pasan los textos):
@@ -15,14 +16,19 @@ const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
 const seg = (t: number, a: number, b: number) => ease(clamp((t - a) / (b - a)));
 const mix = (a: number, b: number, k: number) => a + (b - a) * k;
 
+/** Bandas de la landing (verde Yatay profundo / crema), color del texto y del antetítulo en cada una. */
+export const BANDS = ["#1f4038", "#f3ead9"] as const;
+const TEXT = ["#f3ead9", "#1f3a33"];
+const KICKER = ["#f2a48c", "#00806a"];
+
 /** Paleta de Yatay de noche: verde profundo, el verde del logo y una luz cálida de restaurante. */
 const C = {
-  floor: "#1d2e28",
-  shadow: "#060d0a",
+  floor: "rgba(0,0,0,0.14)",
+  shadow: "rgba(0,0,0,0.16)",
   table: "#8b6a4e",
   tableDark: "#6b513c",
-  chair: "#3f6559",
-  chairDark: "#34554b",
+  chair: "#6f9c8c",
+  chairDark: "#5b8a7b",
   skin: "#e0b08c",
   skin2: "#c98f6b",
   hair: "#16121c",
@@ -91,7 +97,7 @@ function Person({ x, y = 500, sit = 0, stride = 0, walking = false, arm = 0, fac
       <g transform={`translate(0 ${bob})`}>
         <path d={leg(-1)} stroke={legs} strokeWidth="13" strokeLinecap="round" strokeLinejoin="round" fill="none" />
         <path d={leg(1)} stroke={legs} strokeWidth="13" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-        <rect x="-23" y={torsoTop} width="46" height="98" rx="23" fill={body} />
+        <rect x="-23" y={torsoTop} width="46" height="98" rx="23" fill={body} stroke="rgba(0,0,0,0.12)" strokeWidth="2" />
         {apron && <rect x="-19" y={torsoTop + 46} width="38" height="50" rx="10" fill={apron} />}
         <circle cx="2" cy={torsoTop - 26} r="23" fill={skin} />
         <path d={`M -21 ${torsoTop - 28} a 23 23 0 0 1 44 -6 q -14 -4 -30 6 z`} fill={hair} />
@@ -248,37 +254,15 @@ function Scene({ t, pan }: { t: number; pan: boolean }) {
 
   return (
     <svg viewBox={view} className="size-full" role="img" aria-label="Una persona llega a una mesa, escanea el QR, el mozo le trae el pedido, chatea con la mesa de al lado y la noche sigue en un boliche con pantalla gigante">
-      <defs>
-        <radialGradient id="ls-g1" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#0f4a3b" />
-          <stop offset="100%" stopColor="#0f4a3b" stopOpacity="0" />
-        </radialGradient>
-        <radialGradient id="ls-g2" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#4a3313" />
-          <stop offset="100%" stopColor="#4a3313" stopOpacity="0" />
-        </radialGradient>
-        <radialGradient id="ls-g3" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#5b2a7a" />
-          <stop offset="100%" stopColor="#5b2a7a" stopOpacity="0" />
-        </radialGradient>
-        <radialGradient id="ls-g4" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#0f6b74" />
-          <stop offset="100%" stopColor="#0f6b74" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-
-      {/* Luces del restaurante que se apagan; luces del boliche que se prenden. */}
-      <g opacity={1 - club}>
-        <circle cx={mix(620, 520, t / 6)} cy={mix(250, 300, t / 6)} r="300" fill="url(#ls-g1)" />
-        <circle cx={mix(250, 380, t / 6)} cy="420" r="220" fill="url(#ls-g2)" />
-      </g>
+      {/* Boliche: haces de luz planos que barren la escena. */}
       {club > 0 && (
-        <g opacity={club}>
-          <circle cx={300 + Math.sin(t * 5) * 80} cy="260" r="280" fill="url(#ls-g3)" />
-          <circle cx={720 + Math.cos(t * 4) * 80} cy="300" r="260" fill="url(#ls-g4)" />
+        <g opacity={club * 0.22}>
+          <path d={`M 500 0 L ${330 + Math.sin(t * 6) * 140} 520 L ${430 + Math.sin(t * 6) * 140} 520 Z`} fill="#c98bff" />
+          <path d={`M 500 0 L ${640 + Math.cos(t * 5) * 140} 520 L ${740 + Math.cos(t * 5) * 140} 520 Z`} fill="#5fe1d0" />
+          <path d={`M 500 0 L ${180 + Math.cos(t * 7) * 90} 520 L ${260 + Math.cos(t * 7) * 90} 520 Z`} fill="#f2b24c" />
         </g>
       )}
-      <path d="M 40 500 Q 500 486 960 500" stroke={C.floor} strokeWidth="6" strokeLinecap="round" fill="none" />
+      <path d="M 40 500 Q 300 494 520 499 T 960 500" stroke={C.floor} strokeWidth="4" strokeLinecap="round" fill="none" />
 
       <g transform={`translate(${shift} 0)`}>
         {/* ── Restaurante ── */}
@@ -433,22 +417,49 @@ export function ScrollStory({ steps }: { steps: { title: React.ReactNode; text: 
     };
   }, []);
 
+  // Bandas: pares verde (texto crema), impares crema (texto verde). El texto va sin recuadro.
+  const band = (i: number) => BANDS[i % 2];
+  const sectionClass = "flex min-h-[100svh] items-end px-4 pb-14 pt-[48svh] sm:px-6 md:items-center md:pb-0 md:pt-0";
+  const copyBox = "max-w-md rounded-2xl py-4 md:py-0";
+  const inner = (i: number) => `mx-auto w-full max-w-6xl ${i % 2 ? "md:flex md:justify-end" : ""}`;
+  const Copy = ({ s: st }: { s: (typeof steps)[number] }) => (
+    <>
+      {st.title}
+      <div className="mt-5 text-lg leading-relaxed opacity-80">{st.text}</div>
+      {st.extra}
+    </>
+  );
+
   return (
     <div ref={ref} className="relative">
-      {/* Escena fija: en celular arriba; en compu ocupa todo el fondo y el texto va a los costados. */}
-      <div className="pointer-events-none sticky top-16 z-0 h-[46svh] md:h-[calc(100svh-4rem)]">
+      {/* 1) Fondo: una banda por sección (mismo alto que el texto, que se repite invisible). */}
+      <div aria-hidden className="absolute inset-0 z-0">
+        {steps.map((st, i) => (
+          <section key={i} className={`relative ${sectionClass}`} style={{ background: band(i) }}>
+            {i > 0 && <TornEdge color={band(i)} seed={i * 3 + 1} className="absolute inset-x-0 top-0 -translate-y-[70%]" />}
+            <div className={`invisible ${inner(i)}`}>
+              <div className={copyBox}>
+                <Copy s={st} />
+              </div>
+            </div>
+          </section>
+        ))}
+      </div>
+
+      {/* 2) Escena fija: en celular arriba; en compu ocupa todo el fondo y el texto va a los costados. */}
+      <div className="pointer-events-none sticky top-16 z-10 h-[46svh] md:h-[calc(100svh-4rem)]">
         <div className="mx-auto h-full max-w-6xl px-2 md:px-6">
           <Scene t={p * (steps.length - 1)} pan={wide} />
         </div>
       </div>
-      <div className="relative z-10 -mt-[46svh] md:-mt-[calc(100svh-4rem)]">
-        {steps.map((s, i) => (
-          <section key={i} className="flex min-h-[100svh] items-end px-4 pb-10 pt-[48svh] sm:px-6 md:items-center md:pb-0 md:pt-0">
-            <div className={`mx-auto w-full max-w-6xl ${i % 2 ? "md:flex md:justify-end" : ""}`}>
-              <div className="max-w-md rounded-3xl border border-white/5 bg-[#0e1a16]/80 p-6 backdrop-blur-md md:p-8">
-                {s.title}
-                <div className="mt-4 text-lg leading-relaxed text-[#a6b8b0]">{s.text}</div>
-                {s.extra}
+
+      {/* 3) Textos. En celular llevan el color de su banda de fondo para no quedar encima del dibujo. */}
+      <div className="relative z-20 -mt-[46svh] md:-mt-[calc(100svh-4rem)]">
+        {steps.map((st, i) => (
+          <section key={i} className={sectionClass} style={{ color: TEXT[i % 2], ["--kicker" as string]: KICKER[i % 2] }}>
+            <div className={inner(i)}>
+              <div className={copyBox} style={{ background: wide ? undefined : band(i) }}>
+                <Copy s={st} />
               </div>
             </div>
           </section>
