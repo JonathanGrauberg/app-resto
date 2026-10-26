@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight, Flag, MessagesSquare } from "lucide-react";
 import { PageHeader } from "@/components/app-shell";
+import { ChamullameWordmark } from "@/components/chamullame-mark";
 import { Badge, Card } from "@/components/ui/card";
 import { requireTenantRole } from "@/lib/auth/guards";
 import { ADMIN_ROLES } from "@/lib/auth/permissions";
@@ -11,7 +12,7 @@ import { getRegion } from "@/lib/region-server";
 import { db } from "@/lib/db";
 import { BlockedWordsForm, NewGroup, NewWallForm } from "./forms";
 
-export const metadata: Metadata = { title: "Muro" };
+export const metadata: Metadata = { title: "Chamullame" };
 
 const PHASE = {
   ahora: { label: "En curso", tone: "ok" },
@@ -45,7 +46,10 @@ export default async function MuroPage() {
 
   return (
     <>
-      <PageHeader title="Muro" description="Mensajes en la pantalla del local durante un evento, y chat de mesa. Todo con filtro de palabras y +18." />
+      <PageHeader
+        title={<ChamullameWordmark />}
+        description="Pantalla gigante para eventos (el muro), chat de cada mesa y chamullos entre mesas. Todo con filtro de palabras y +18."
+      />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px] lg:items-start">
         <div className="space-y-8">

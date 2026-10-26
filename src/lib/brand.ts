@@ -22,3 +22,14 @@ export const BRAND = {
   /** Remitente por defecto de los emails (si no se configura EMAIL_FROM). */
   emailFromName: "Reservas",
 } as const;
+
+/**
+ * Chamullame: la app social (pantalla gigante, chat de mesa, chamullos entre mesas) que se suma a Yatay
+ * o se contrata sola (boliches, eventos, casamientos). En el código es el módulo MURO.
+ */
+export const CHAMULLAME = {
+  name: "Chamullame",
+  tagline: "Lo que pasa entre mesas",
+  /** Su página propia (hasta tener dominio). */
+  path: "/chamullame",
+} as const;

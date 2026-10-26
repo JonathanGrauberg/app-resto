@@ -21,6 +21,7 @@ import {
   Wine,
 } from "lucide-react";
 import { cn } from "@/lib/format";
+import { ChamullameMark } from "./chamullame-mark";
 import type { NavItem } from "./app-shell";
 
 const ICONS = {
@@ -40,6 +41,7 @@ const ICONS = {
   planes: Layers,
   muro: MessagesSquare,
   enlaces: Link2,
+  chamullame: ChamullameMark,
 };
 
 export type NavIcon = keyof typeof ICONS;

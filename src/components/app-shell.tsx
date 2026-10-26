@@ -16,12 +16,15 @@ export function AppShell({
   subtitle,
   nav,
   userName,
+  badge,
   children,
 }: {
   title: string;
   subtitle?: string;
   nav: NavItem[];
   userName: string;
+  /** Algo junto al nombre del local (ej. el logo de Chamullame si lo tienen). */
+  badge?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -32,8 +35,13 @@ export function AppShell({
           <Link href="/" className="mb-3 block" aria-label="Yatay">
             <BrandMark className="h-9" />
           </Link>
-          <p className="truncate text-lg font-semibold">{title}</p>
-          {subtitle && <p className="truncate text-xs text-muted">{subtitle}</p>}
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-lg font-semibold">{title}</p>
+              {subtitle && <p className="truncate text-xs text-muted">{subtitle}</p>}
+            </div>
+            {badge}
+          </div>
         </div>
         <NavLinks items={nav} variant="side" />
         <div className="mt-auto border-t border-line p-3">
@@ -75,7 +83,7 @@ export function PageHeader({
   description,
   actions,
 }: {
-  title: string;
+  title: React.ReactNode;
   description?: string;
   actions?: React.ReactNode;
 }) {

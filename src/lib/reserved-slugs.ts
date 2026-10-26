@@ -1,7 +1,7 @@
 /** Slugs que no puede usar un restaurante porque chocan con rutas de la app. */
 export const RESERVED_SLUGS = new Set([
   "admin", "staff", "platform", "login", "logout", "api", "app", "_next",
-  "registro", "precios", "ayuda", "legal", "privacidad", "cookies", "static",
+  "registro", "precios", "ayuda", "legal", "privacidad", "cookies", "static", "chamullame",
 ]);
 
 export function isValidSlug(slug: string) {

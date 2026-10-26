@@ -11,7 +11,7 @@ export const MODULES: { key: ModuleKey; label: string; description: string }[] =
   { key: "BI", label: "Métricas", description: "Rotación, estadía y facturación por mesa" },
   { key: "MULTI_IDIOMA", label: "Multi-idioma", description: "Traducciones propias de la carta" },
   { key: "COMPRAS", label: "Compras", description: "Carga de compras y comparación con lo vendido (semana / mes)" },
-  { key: "MURO", label: "Muro", description: "Mensajes en pantalla gigante por evento y chat de mesa" },
+  { key: "MURO", label: "Chamullame", description: "App social que se suma a Yatay: pantalla gigante, chat de mesa y chamullos entre mesas" },
 ];
 
 export async function getEnabledModules(tenantId: string): Promise<Set<ModuleKey>> {

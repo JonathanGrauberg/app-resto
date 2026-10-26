@@ -20,14 +20,14 @@ export const PLANS: { id: string; label: string; description: string; modules: M
   },
   {
     id: "muro",
-    label: "Muro",
-    description: "Solo el Muro: mensajes en pantalla y chat de mesa. Sirve aunque el local use otro sistema.",
+    label: "Chamullame",
+    description: "Solo Chamullame: pantalla gigante, chat de mesa y chamullos entre mesas. Para boliches, eventos y casamientos, aunque usen otro sistema.",
     modules: ["MURO"],
   },
   {
     id: "completo",
     label: "Completo",
-    description: "Todo lo del Salón, más reservas, métricas, compras y el Muro.",
+    description: "Todo lo del Salón, más reservas, métricas, compras y Chamullame.",
     modules: ["CARTA_QR", "PEDIDOS", "KDS", "CAJA", "RESERVAS", "BI", "COMPRAS", "MURO"],
   },
 ];

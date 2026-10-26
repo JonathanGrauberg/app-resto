@@ -53,7 +53,7 @@ export default function Home() {
                   Tu local, <em>en orden</em> de la carta a la caja.
                 </Title>
               ),
-              text: "Para restaurantes, bares, cafeterías y boliches. Bajá y mirá cómo es una noche con Yatay.",
+              text: "Para restaurantes, bares, cafeterías y heladerías. Bajá y mirá cómo es una visita con Yatay.",
               extra: <p className="mt-10 text-sm opacity-60">↓ Seguí bajando</p>,
             },
             {
@@ -87,22 +87,6 @@ export default function Home() {
                 </Title>
               ),
               text: "La cuenta se divide fácil, se cobra con el medio que quieran y al final del día los números están claros.",
-            },
-            {
-              title: (
-                <Title kicker="Entre mesas">
-                  Y la mesa de al lado <em>también se suma.</em>
-                </Title>
-              ),
-              text: "Si las dos quieren, chatean entre mesas desde la misma carta. Sin pasarse números y con todo moderado.",
-            },
-            {
-              title: (
-                <Title kicker="La noche sigue">
-                  En el boliche, <em>todos en la pantalla.</em>
-                </Title>
-              ),
-              text: "Mensajes, fotos y me gusta en la pantalla gigante. El lugar se vuelve parte de la fiesta.",
               extra: (
                 <div className="mt-8 flex flex-wrap gap-3">
                   <ButtonLink href="/login" size="lg" className="rounded-full !bg-[#e2725b] px-6 text-white hover:!bg-[#cf6049]">
