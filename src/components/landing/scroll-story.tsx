@@ -14,27 +14,29 @@ const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
 const seg = (p: number, a: number, b: number) => ease(clamp((p - a) / (b - a)));
 const mix = (a: number, b: number, t: number) => a + (b - a) * t;
 
+/** Paleta de Yatay de noche: verde profundo, el verde del logo y una luz cálida de restaurante. */
 const C = {
-  floor: "#efe4d6",
-  shadow: "#e2d3c1",
-  table: "#e8c9a6",
-  tableDark: "#d8b48d",
-  chair: "#c9bfe4",
-  chairDark: "#b4a8d8",
-  skin: "#f2c6a6",
-  hair: "#3f3a4f",
-  guest: "#7cbfa8",
-  guestLegs: "#4f6f8f",
-  waiter: "#f6f1e9",
-  waiterApron: "#f29c84",
-  waiterLegs: "#3f3a4f",
-  phone: "#2f2b3d",
-  glow: "#bfe9dc",
-  qr: "#2f2b3d",
-  cup: "#fbe3ec",
-  scoop1: "#f7b6c8",
-  scoop2: "#f8e3a3",
-  scoop3: "#a8dcc8",
+  floor: "#1d2e28",
+  shadow: "#060d0a",
+  table: "#8b6a4e",
+  tableDark: "#6b513c",
+  chair: "#3f6559",
+  chairDark: "#34554b",
+  skin: "#e0b08c",
+  hair: "#16121c",
+  guest: "#3ccfa4",
+  guestLegs: "#24364c",
+  waiter: "#e9ece8",
+  waiterApron: "#00806a",
+  waiterLegs: "#16121c",
+  phone: "#0d1411",
+  glow: "#9ff0d6",
+  qr: "#0d1411",
+  plate: "#eef1ee",
+  food: "#c9773f",
+  greens: "#4f9d6b",
+  wine: "#7a1f35",
+  heart: "#f2b24c",
 };
 
 type PersonProps = {
@@ -83,7 +85,7 @@ function Person({ x, sit, stride, walking, arm, facing, body, legs, apron, phone
         <path d={`M -21 ${torsoTop - 28} a 23 23 0 0 1 44 -6 q -14 -4 -30 6 z`} fill={C.hair} />
         <path
           d={`M ${shoulder.x} ${shoulder.y} L ${elbow.x} ${elbow.y} L ${hand.x} ${hand.y}`}
-          stroke={body === C.waiter ? "#e8dfd2" : body}
+          stroke={body === C.waiter ? "#d6dbd7" : body}
           strokeWidth="11"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -98,7 +100,7 @@ function Person({ x, sit, stride, walking, arm, facing, body, legs, apron, phone
         )}
         {tray && (
           <g transform={`translate(${hand.x + 10} ${hand.y - 4})`}>
-            <rect x="-34" y="0" width="68" height="6" rx="3" fill="#cfd8d4" />
+            <rect x="-34" y="0" width="68" height="6" rx="3" fill="#b9c4bf" />
           </g>
         )}
       </g>
@@ -106,16 +108,20 @@ function Person({ x, sit, stride, walking, arm, facing, body, legs, apron, phone
   );
 }
 
-/** Copa de helado de tres bochas. */
-function IceCream({ x, y, scale = 1 }: { x: number; y: number; scale?: number }) {
+/** Plato con comida y una copa de vino. */
+function Dish({ x, y, scale = 1 }: { x: number; y: number; scale?: number }) {
   return (
     <g transform={`translate(${x} ${y}) scale(${scale})`}>
-      <circle cx="-9" cy="-30" r="11" fill={C.scoop1} />
-      <circle cx="9" cy="-30" r="11" fill={C.scoop3} />
-      <circle cx="0" cy="-42" r="11" fill={C.scoop2} />
-      <path d="M -20 -24 L 20 -24 L 12 -4 L -12 -4 Z" fill={C.cup} />
-      <rect x="-3" y="-4" width="6" height="8" fill={C.cup} />
-      <ellipse cx="0" cy="5" rx="12" ry="3" fill={C.cup} />
+      <ellipse cx="0" cy="-4" rx="30" ry="8" fill={C.plate} />
+      <ellipse cx="-4" cy="-9" rx="15" ry="6" fill={C.food} />
+      <circle cx="9" cy="-11" r="4" fill={C.greens} />
+      <circle cx="13" cy="-8" r="3" fill={C.greens} />
+      <g transform="translate(40 -4)">
+        <path d="M -8 -34 Q 0 -16 8 -34 Z" fill={C.wine} />
+        <path d="M -9 -36 Q 0 -10 9 -36" stroke={C.plate} strokeWidth="2" fill="none" opacity="0.7" />
+        <rect x="-1" y="-20" width="2" height="18" fill={C.plate} opacity="0.8" />
+        <ellipse cx="0" cy="-1" rx="7" ry="2" fill={C.plate} opacity="0.8" />
+      </g>
     </g>
   );
 }
@@ -137,15 +143,15 @@ function Scene({ p, pan }: { p: number; pan: boolean }) {
   const happy = seg(p, 0.92, 0.97);
 
   return (
-    <svg viewBox={pan ? "0 0 1000 600" : "290 150 520 380"} className="size-full" role="img" aria-label="Una persona llega a una mesa, escanea el QR, el mozo le trae un helado y se va">
+    <svg viewBox={pan ? "0 0 1000 600" : "290 150 520 380"} className="size-full" role="img" aria-label="Una persona llega a una mesa, escanea el QR, el mozo le trae el pedido y se va">
       <defs>
         <radialGradient id="ls-blob1" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#d6efe5" />
-          <stop offset="100%" stopColor="#d6efe5" stopOpacity="0" />
+          <stop offset="0%" stopColor="#0f4a3b" />
+          <stop offset="100%" stopColor="#0f4a3b" stopOpacity="0" />
         </radialGradient>
         <radialGradient id="ls-blob2" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#fbe0d4" />
-          <stop offset="100%" stopColor="#fbe0d4" stopOpacity="0" />
+          <stop offset="0%" stopColor="#4a3313" />
+          <stop offset="100%" stopColor="#4a3313" stopOpacity="0" />
         </radialGradient>
       </defs>
       {/* Fondo: manchas suaves que se desplazan un poco con el scroll. */}
@@ -174,7 +180,7 @@ function Scene({ p, pan }: { p: number; pan: boolean }) {
         <ellipse cx="590" cy="496" rx="36" ry="7" fill={C.tableDark} />
         <ellipse cx="590" cy="388" rx="104" ry="18" fill={C.table} />
         <g transform="translate(628 352)">
-          <path d="M 0 30 L 6 0 L 24 0 L 30 30 Z" fill="#fffaf3" stroke={C.tableDark} strokeWidth="2" />
+          <path d="M 0 30 L 6 0 L 24 0 L 30 30 Z" fill="#f4f1ea" stroke={C.tableDark} strokeWidth="2" />
           <g fill={C.qr}>
             <rect x="9" y="6" width="5" height="5" />
             <rect x="16" y="6" width="5" height="5" />
@@ -183,7 +189,7 @@ function Scene({ p, pan }: { p: number; pan: boolean }) {
             <rect x="12" y="20" width="6" height="4" />
           </g>
         </g>
-        {served > 0 && <IceCream x={mix(630, 568, served)} y={mix(318, 380, served)} scale={mix(0.9, 1, served)} />}
+        {served > 0 && <Dish x={mix(630, 568, served)} y={mix(318, 380, served)} scale={mix(0.9, 1, served)} />}
       </g>
 
       {/* Escaneo: haz de luz del celular al QR */}
@@ -196,16 +202,16 @@ function Scene({ p, pan }: { p: number; pan: boolean }) {
       {/* La carta abierta en el celular */}
       {menu > 0 && (
         <g transform={`translate(520 ${mix(190, 150, menu)})`} opacity={menu}>
-          <rect x="0" y="0" width="130" height="150" rx="18" fill="#ffffff" stroke="#ece4d8" strokeWidth="2" />
-          <rect x="16" y="18" width="60" height="9" rx="4.5" fill="#cfe9df" />
+          <rect x="0" y="0" width="130" height="150" rx="18" fill="#14231e" stroke="#2b4a40" strokeWidth="2" />
+          <rect x="16" y="18" width="60" height="9" rx="4.5" fill="#3ccfa4" />
           {[0, 1, 2].map((i) => (
             <g key={i} transform={`translate(16 ${42 + i * 30})`}>
-              <rect width="20" height="20" rx="6" fill={[C.scoop1, C.scoop2, C.scoop3][i]} />
-              <rect x="28" y="4" width="54" height="6" rx="3" fill="#e9e1d6" />
-              <rect x="28" y="13" width="32" height="5" rx="2.5" fill="#f1ebe2" />
+              <rect width="20" height="20" rx="6" fill={[C.food, C.greens, C.wine][i]} />
+              <rect x="28" y="4" width="54" height="6" rx="3" fill="#2f4a41" />
+              <rect x="28" y="13" width="32" height="5" rx="2.5" fill="#23382f" />
             </g>
           ))}
-          <rect x="16" y="128" width="98" height="12" rx="6" fill="#7cbfa8" />
+          <rect x="16" y="128" width="98" height="12" rx="6" fill="#00806a" />
         </g>
       )}
 
@@ -222,14 +228,14 @@ function Scene({ p, pan }: { p: number; pan: boolean }) {
         apron={C.waiterApron}
         tray={!leaving}
       />
-      {wIn > 0 && served === 0 && <IceCream x={waiterX - 46} y={318} scale={0.9} />}
+      {wIn > 0 && served === 0 && <Dish x={waiterX - 46} y={318} scale={0.9} />}
 
       {/* Burbuja del mozo */}
       {served > 0.5 && !leaving && (
         <g transform="translate(700 210)" opacity={seg(p, 0.76, 0.8)}>
-          <rect x="0" y="0" width="150" height="44" rx="22" fill="#ffffff" stroke="#ece4d8" strokeWidth="2" />
-          <path d="M 30 44 L 22 58 L 46 44 Z" fill="#ffffff" />
-          <text x="75" y="28" textAnchor="middle" fontSize="16" fontFamily="inherit" fill="#3f3a4f">¡Acá está!</text>
+          <rect x="-14" y="0" width="178" height="44" rx="22" fill="#eef4f1" />
+          <path d="M 30 44 L 22 58 L 46 44 Z" fill="#eef4f1" />
+          <text x="75" y="28" textAnchor="middle" fontSize="16" fontFamily="inherit" fill="#0b1512">¡Que lo disfrutes!</text>
         </g>
       )}
 
@@ -241,7 +247,7 @@ function Scene({ p, pan }: { p: number; pan: boolean }) {
             transform={`translate(${470 + i * 22 - 22} ${mix(300, 250 - i * 14, happy)}) scale(${0.8 + i * 0.1})`}
             opacity={happy * (1 - i * 0.2)}
             d="M 0 4 C -6 -4 -14 2 0 12 C 14 2 6 -4 0 4 Z"
-            fill={C.waiterApron}
+            fill={C.heart}
           />
         ))}
       </g>
@@ -294,9 +300,9 @@ export function ScrollStory({ steps }: { steps: { title: React.ReactNode; text: 
         {steps.map((s, i) => (
           <section key={i} className="flex min-h-[100svh] items-end px-4 pb-10 pt-[48svh] sm:px-6 md:items-center md:pb-0 md:pt-0">
             <div className={`mx-auto w-full max-w-6xl ${i % 2 ? "md:flex md:justify-end" : ""}`}>
-              <div className="max-w-md rounded-3xl bg-[#fbf7f1]/85 p-6 backdrop-blur-sm md:p-8">
+              <div className="max-w-md rounded-3xl border border-white/5 bg-[#0e1a16]/80 p-6 backdrop-blur-md md:p-8">
                 {s.title}
-                <div className="mt-4 text-lg leading-relaxed text-[#6b6577]">{s.text}</div>
+                <div className="mt-4 text-lg leading-relaxed text-[#a6b8b0]">{s.text}</div>
                 {s.extra}
               </div>
             </div>

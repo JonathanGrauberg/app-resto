@@ -7,32 +7,32 @@ import { ButtonLink } from "@/components/ui/button";
 import { BRAND } from "@/lib/brand";
 
 /** Carta de ejemplo para mostrar (local demo de Argentina). */
-const DEMO_SLUG = "heladeria-demo";
+const DEMO_SLUG = "parrilla-demo";
 
 const serif = Instrument_Serif({ weight: "400", style: ["normal", "italic"], subsets: ["latin"] });
 
 function Title({ kicker, children, as: H = "h2" }: { kicker: string; children: React.ReactNode; as?: "h1" | "h2" }) {
   return (
     <>
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#00806a]">{kicker}</p>
-      <H className={`${serif.className} mt-3 text-5xl leading-[1.02] text-balance text-[#2f2b3d] sm:text-6xl`}>{children}</H>
+      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#3ccfa4]">{kicker}</p>
+      <H className={`${serif.className} mt-3 text-5xl leading-[1.02] text-balance text-[#eef4f1] sm:text-6xl`}>{children}</H>
     </>
   );
 }
 
 /**
  * Portada pública. La historia se cuenta con el scroll: una persona llega, se sienta, escanea el QR,
- * el mozo le trae el pedido. Paleta pastel propia (no sigue el modo oscuro: es la vidriera).
+ * el mozo le trae el pedido. Siempre en la paleta oscura de Yatay (es la vidriera: no sigue el tema del sistema).
  */
 export default function Home() {
   return (
-    <div className="flex flex-1 flex-col bg-[#fbf7f1] text-[#2f2b3d]">
-      <header className="sticky top-0 z-30 border-b border-[#ece4d8] bg-[#fbf7f1]/85 backdrop-blur">
+    <div className="flex flex-1 flex-col bg-[#0b1512] text-[#eef4f1] [color-scheme:dark]">
+      <header className="sticky top-0 z-30 border-b border-white/5 bg-[#0b1512]/80 backdrop-blur">
         <nav className="mx-auto flex h-16 w-full max-w-6xl items-center gap-3 px-4 sm:px-6">
           <Link href="/" aria-label={BRAND.name} className="mr-auto">
-            <BrandMark className="h-10" priority fixed />
+            <BrandMark className="h-10" priority fixed="dark" />
           </Link>
-          <Link href={`/${DEMO_SLUG}`} className="hidden rounded-lg px-3 py-2 text-sm font-medium text-[#6b6577] hover:text-[#2f2b3d] sm:block">
+          <Link href={`/${DEMO_SLUG}`} className="hidden rounded-lg px-3 py-2 text-sm font-medium text-[#a6b8b0] hover:text-white sm:block">
             Ver una carta de ejemplo
           </Link>
           <ButtonLink href="/login" size="sm" className="bg-[#00806a] text-white hover:bg-[#006e5b]">
@@ -50,8 +50,8 @@ export default function Home() {
                   Tu local, <em>en orden</em> de la carta a la caja.
                 </Title>
               ),
-              text: "Para restaurantes, bares, cafeterías y heladerías. Bajá y mirá cómo es una visita con Yatay.",
-              extra: <p className="mt-8 text-sm text-[#9b94a6]">↓ Seguí bajando</p>,
+              text: "Para restaurantes, bares y cafeterías. Bajá y mirá cómo es una noche con Yatay.",
+              extra: <p className="mt-8 text-sm text-[#6f8780]">↓ Seguí bajando</p>,
             },
             {
               title: (
@@ -89,7 +89,7 @@ export default function Home() {
                   <ButtonLink href="/login" size="lg" className="bg-[#00806a] text-white hover:bg-[#006e5b]">
                     <LogIn className="size-5" aria-hidden /> Iniciar sesión
                   </ButtonLink>
-                  <ButtonLink href={`/${DEMO_SLUG}`} size="lg" variant="secondary" className="border-[#e6dccd] bg-white text-[#2f2b3d] hover:bg-[#f6efe5]">
+                  <ButtonLink href={`/${DEMO_SLUG}`} size="lg" variant="secondary" className="border-white/10 bg-white/5 text-[#eef4f1] hover:bg-white/10">
                     <QrCode className="size-5" aria-hidden /> Ver una carta
                   </ButtonLink>
                 </div>
@@ -105,9 +105,9 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="border-t border-[#ece4d8]">
-        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-6 text-sm text-[#6b6577] sm:px-6">
-          <BrandMark variant="icon" className="h-7" fixed />
+      <footer className="border-t border-white/5">
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-6 text-sm text-[#8aa198] sm:px-6">
+          <BrandMark variant="icon" className="h-7" fixed="dark" />
           <span>
             {BRAND.name} · {BRAND.slogan}
           </span>

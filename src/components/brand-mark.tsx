@@ -16,8 +16,8 @@ export function BrandMark({
   variant?: "full" | "icon";
   className?: string;
   priority?: boolean;
-  /** Siempre la versión a color (fondos claros propios, como la landing). */
-  fixed?: boolean;
+  /** Siempre la misma versión, sin importar el tema: "light" = a color, "dark" = blanca (fondos oscuros propios, como la landing). */
+  fixed?: "light" | "dark";
 }) {
   const [src, srcDark, w, h] =
     variant === "full"
@@ -26,8 +26,14 @@ export function BrandMark({
   const img = cn("h-full w-auto", variant === "full" ? "max-w-none" : "");
   return (
     <span className={cn("inline-flex h-8 shrink-0 items-center", className)}>
-      <Image src={src} alt={BRAND.name} width={w} height={h} priority={priority} className={cn(img, !fixed && "dark:hidden")} />
-      {!fixed && <Image src={srcDark} alt={BRAND.name} width={w} height={h} priority={priority} className={cn(img, "hidden dark:block")} />}
+      {fixed ? (
+        <Image src={fixed === "dark" ? srcDark : src} alt={BRAND.name} width={w} height={h} priority={priority} className={img} />
+      ) : (
+        <>
+          <Image src={src} alt={BRAND.name} width={w} height={h} priority={priority} className={cn(img, "dark:hidden")} />
+          <Image src={srcDark} alt={BRAND.name} width={w} height={h} priority={priority} className={cn(img, "hidden dark:block")} />
+        </>
+      )}
     </span>
   );
 }
