@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { BAND_KICKER as KICKER, BAND_TEXT as TEXT, BANDS } from "./palette";
 import { TornEdge } from "./torn-edge";
 
 /**
@@ -15,11 +16,6 @@ const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
 /** Avance 0→1 de un tramo [a, b] de la historia. */
 const seg = (t: number, a: number, b: number) => ease(clamp((t - a) / (b - a)));
 const mix = (a: number, b: number, k: number) => a + (b - a) * k;
-
-/** Bandas de la landing (verde Yatay profundo / crema), color del texto y del antetítulo en cada una. */
-export const BANDS = ["#1f4038", "#f3ead9"] as const;
-const TEXT = ["#f3ead9", "#1f3a33"];
-const KICKER = ["#f2a48c", "#00806a"];
 
 /** Paleta de Yatay de noche: verde profundo, el verde del logo y una luz cálida de restaurante. */
 const C = {
@@ -256,10 +252,10 @@ function Scene({ t, pan }: { t: number; pan: boolean }) {
     <svg viewBox={view} className="size-full" role="img" aria-label="Una persona llega a una mesa, escanea el QR, el mozo le trae el pedido, chatea con la mesa de al lado y la noche sigue en un boliche con pantalla gigante">
       {/* Boliche: haces de luz planos que barren la escena. */}
       {club > 0 && (
-        <g opacity={club * 0.22}>
-          <path d={`M 500 0 L ${330 + Math.sin(t * 6) * 140} 520 L ${430 + Math.sin(t * 6) * 140} 520 Z`} fill="#c98bff" />
-          <path d={`M 500 0 L ${640 + Math.cos(t * 5) * 140} 520 L ${740 + Math.cos(t * 5) * 140} 520 Z`} fill="#5fe1d0" />
-          <path d={`M 500 0 L ${180 + Math.cos(t * 7) * 90} 520 L ${260 + Math.cos(t * 7) * 90} 520 Z`} fill="#f2b24c" />
+        <g opacity={club * 0.22} transform={`translate(${shift} 0)`}>
+          <path d={`M 500 0 L ${330 + Math.sin(t * 6) * 140} 500 L ${430 + Math.sin(t * 6) * 140} 500 Z`} fill="#c98bff" />
+          <path d={`M 500 0 L ${640 + Math.cos(t * 5) * 140} 500 L ${740 + Math.cos(t * 5) * 140} 500 Z`} fill="#5fe1d0" />
+          <path d={`M 500 0 L ${180 + Math.cos(t * 7) * 90} 500 L ${260 + Math.cos(t * 7) * 90} 500 Z`} fill="#f2b24c" />
         </g>
       )}
       <path d="M 40 500 Q 300 494 520 499 T 960 500" stroke={C.floor} strokeWidth="4" strokeLinecap="round" fill="none" />
