@@ -32,7 +32,7 @@ export function LinksForm({
   const [state, action, pending] = useFormAction(saveLinks, undefined);
   const [enabled, setEnabled] = useState(initial.enabled);
   const [theme, setTheme] = useState<LinkTheme>(initial.theme);
-  const [rows, setRows] = useState<Row[]>(() => initial.links.filter((l) => hasBooking || l.type !== "reservas").map(keyed));
+  const [rows, setRows] = useState<Row[]>(() => initial.links.map(keyed));
   const [copied, setCopied] = useState(false);
 
   const update = (key: string, patch: Partial<LinkItem>) => setRows((r) => r.map((x) => (x.key === key ? { ...x, ...patch } : x)));
@@ -111,7 +111,7 @@ export function LinksForm({
           <ul className="mt-4 space-y-3">
             {rows.map((r, i) => {
               const meta = r.type === "custom" ? null : LINK_TYPES[r.type];
-              const needsValue = r.type !== "carta" && r.type !== "reservas";
+              const needsValue = r.type !== "carta" && !(r.type === "reservas" && hasBooking);
               return (
                 <li key={r.key} className={cn("rounded-xl border p-3", r.enabled ? "border-line" : "border-line/60 opacity-70")}>
                   <div className="flex items-center gap-2">
@@ -149,7 +149,8 @@ export function LinksForm({
                           maxLength={300}
                         />
                       )}
-                      {meta?.hint && <p className="text-xs text-muted sm:col-span-2">{meta.hint}</p>}
+                      {meta?.hint && (r.type !== "reservas" || !hasBooking) && <p className="text-xs text-muted sm:col-span-2">{meta.hint}</p>}
+                      {r.type === "reservas" && hasBooking && <p className="text-xs text-muted sm:col-span-2">Lleva a tu página de reservas online.</p>}
                     </div>
                   )}
                 </li>
@@ -176,8 +177,8 @@ export function LinksForm({
       {/* Vista previa en un "celular" */}
       <div className="lg:sticky lg:top-8">
         <p className="mb-2 text-sm font-medium text-muted">Así se ve</p>
-        <div className="mx-auto h-[640px] w-[320px] overflow-hidden rounded-[2.2rem] border-[6px] border-ink/80 shadow-xl">
-          <div className="pointer-events-none h-full origin-top-left overflow-y-auto" inert>
+        <div className="relative mx-auto h-[640px] w-[320px] overflow-hidden rounded-[2.2rem] border-[6px] border-ink/80 shadow-xl [transform:translateZ(0)]">
+          <div className="pointer-events-none flex h-full flex-col overflow-y-auto [&>main]:min-h-full" inert>
             <LinksPage venue={venue} links={links} theme={theme} cartaHref="#" bookingHref={hasBooking ? "#" : null} country={country} />
           </div>
         </div>

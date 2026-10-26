@@ -72,12 +72,12 @@ export function LinksPage({
   const cover = theme === "cover" && venue.coverImageUrl;
 
   return (
-    <main className="relative flex min-h-dvh flex-1 flex-col items-center px-5 pb-8 pt-12" style={{ background: t.bg, color: t.fg }}>
+    <main className="relative isolate flex min-h-dvh flex-1 flex-col items-center overflow-hidden px-5 pb-8 pt-12" style={{ background: t.bg, color: t.fg }}>
       {cover && (
         <>
           {/* eslint-disable-next-line @next/next/no-img-element -- ya vienen comprimidas */}
-          <img src={venue.coverImageUrl!} alt="" className="fixed inset-0 -z-0 size-full object-cover" />
-          <div className="fixed inset-0 bg-black/60" />
+          <img src={venue.coverImageUrl!} alt="" className="absolute inset-0 size-full object-cover" />
+          <div className="absolute inset-0 bg-black/60" />
         </>
       )}
       <div className="relative flex w-full max-w-md flex-1 flex-col items-center">

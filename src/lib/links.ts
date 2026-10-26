@@ -17,7 +17,7 @@ export type LinkItem = {
 
 export const LINK_TYPES: Record<Exclude<LinkType, "custom">, { label: string; placeholder?: string; hint?: string }> = {
   carta: { label: "Ver la carta" },
-  reservas: { label: "Reservar mesa" },
+  reservas: { label: "Reservar mesa", placeholder: "Enlace o WhatsApp para reservar", hint: "Con el módulo Reservas va a la reserva online; si no, a este enlace o número de WhatsApp" },
   instagram: { label: "Instagram", placeholder: "@usuario o enlace" },
   whatsapp: { label: "WhatsApp", placeholder: "343 611-2205", hint: "El número con característica, sin 0 ni 15" },
   reviews: { label: "Dejanos tu reseña", placeholder: "https://g.page/r/…", hint: "En Google: tu perfil → Pedir reseñas → copiar enlace" },
@@ -79,7 +79,10 @@ export function linkHref(l: LinkItem, ctx: { cartaHref: string; bookingHref: str
     case "carta":
       return ctx.cartaHref;
     case "reservas":
-      return ctx.bookingHref;
+      // Con reservas online, a esa página; si no, al enlace que cargó el local (o a su WhatsApp si es un número).
+      if (ctx.bookingHref) return ctx.bookingHref;
+      if (!v) return null;
+      return /^[+\d\s()-]{6,}$/.test(v) ? linkHref({ type: "whatsapp", enabled: true, value: v }, ctx) : withHttps(v);
     case "instagram":
       if (!v) return null;
       return /instagram\.com|^https?:/i.test(v) ? withHttps(v) : `https://instagram.com/${v.replace(/^@/, "")}`;
