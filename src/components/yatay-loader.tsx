@@ -18,14 +18,10 @@ export function YatayLoader({ letters = true, letterColor = "#ffffff", className
       </g>
       {letters &&
         LETTERS.map((l, i) => (
-          <path
-            key={i}
-            d={l.d}
-            transform={`translate(${l.x} ${l.y})`}
-            fill={letterColor}
-            className="yl-letter"
-            style={{ animationDelay: `${0.85 + i * 0.09}s` }}
-          />
+          // La posición va en el grupo: la animación (CSS transform) pisaría el `transform` del mismo elemento.
+          <g key={i} transform={`translate(${l.x} ${l.y})`}>
+            <path d={l.d} fill={letterColor} className="yl-letter" style={{ animationDelay: `${0.85 + i * 0.09}s` }} />
+          </g>
         ))}
     </svg>
   );
