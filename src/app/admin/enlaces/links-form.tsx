@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDown, ArrowUp, Check, Copy, ExternalLink, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, Copy, ExternalLink, Plus, QrCode, Trash2 } from "lucide-react";
 import { LinksPage } from "@/components/links/links-page";
+import { QrDialog } from "@/components/qr-dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FormError, FormSuccess, Input, Switch } from "@/components/ui/field";
@@ -21,19 +22,24 @@ export function LinksForm({
   venue,
   publicUrl,
   hasBooking,
+  bookingUrl,
   country,
+  slug,
 }: {
   initial: { enabled: boolean; theme: LinkTheme; links: LinkItem[] };
   venue: { name: string; tagline: string | null; logoUrl: string | null; coverImageUrl: string | null };
   publicUrl: string;
   hasBooking: boolean;
+  bookingUrl: string;
   country: string;
+  slug: string;
 }) {
   const [state, action, pending] = useFormAction(saveLinks, undefined);
   const [enabled, setEnabled] = useState(initial.enabled);
   const [theme, setTheme] = useState<LinkTheme>(initial.theme);
   const [rows, setRows] = useState<Row[]>(() => initial.links.map(keyed));
   const [copied, setCopied] = useState(false);
+  const [qr, setQr] = useState(false);
 
   const update = (key: string, patch: Partial<LinkItem>) => setRows((r) => r.map((x) => (x.key === key ? { ...x, ...patch } : x)));
   const move = (i: number, dir: -1 | 1) =>
@@ -73,12 +79,19 @@ export function LinksForm({
             >
               {copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />} {copied ? "Copiado" : "Copiar"}
             </button>
+            <button type="button" onClick={() => setQr(true)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-brand hover:bg-brand-soft">
+              <QrCode className="size-4" aria-hidden /> QR del local
+            </button>
             {initial.enabled && (
               <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-brand hover:bg-brand-soft">
                 <ExternalLink className="size-4" aria-hidden /> Abrir
               </a>
             )}
           </div>
+          <p className="text-xs text-muted">
+            El QR del local es para la vidriera, el mostrador o folletos: abre esta página (o la carta, si la apagás). Los QR de cada mesa siguen en Mesas.
+          </p>
+          {qr && <QrDialog path={`/${slug}/enlaces`} title={venue.name} venue={venue.name} caption="Escaneá para ver la carta, redes y más" onClose={() => setQr(false)} />}
         </Card>
 
         <Card className="p-4 sm:p-5">
@@ -150,7 +163,9 @@ export function LinksForm({
                         />
                       )}
                       {meta?.hint && (r.type !== "reservas" || !hasBooking) && <p className="text-xs text-muted sm:col-span-2">{meta.hint}</p>}
-                      {r.type === "reservas" && hasBooking && <p className="text-xs text-muted sm:col-span-2">Lleva a tu página de reservas online.</p>}
+                      {r.type === "reservas" && hasBooking && (
+                        <Input value={bookingUrl} readOnly aria-label="Dirección de tus reservas online" title="Tu página de reservas online de Yatay" className="text-muted" />
+                      )}
                     </div>
                   )}
                 </li>

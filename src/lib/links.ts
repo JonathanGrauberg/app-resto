@@ -50,8 +50,11 @@ type Settings = {
   links?: unknown;
 } | null;
 
-/** Lo guardado, completado con los tipos fijos que falten (precargados con los datos del local). */
-export function readLinks(s: Settings): LinkItem[] {
+/**
+ * Lo guardado, completado con los tipos fijos que falten (precargados con los datos del local).
+ * `hasBooking`: si toma reservas online, "Reservar" viene prendido (lleva a la reserva de Yatay).
+ */
+export function readLinks(s: Settings, hasBooking = false): LinkItem[] {
   const saved = Array.isArray(s?.links) ? (s!.links as LinkItem[]).filter((l) => l && typeof l.type === "string") : [];
   const defaults: Record<string, string | null | undefined> = {
     instagram: s?.instagramUrl,
@@ -65,7 +68,7 @@ export function readLinks(s: Settings): LinkItem[] {
   for (const t of FIXED_TYPES) {
     if (out.some((l) => l.type === t)) continue;
     const value = defaults[t] ?? undefined;
-    out.push({ type: t, enabled: t === "carta" || !!value, value: value ?? undefined });
+    out.push({ type: t, enabled: t === "carta" || (t === "reservas" && hasBooking) || !!value, value: value ?? undefined });
   }
   return out;
 }

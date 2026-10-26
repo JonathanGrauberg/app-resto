@@ -26,11 +26,13 @@ export default async function AdminLinksPage() {
         description="Tu página con la carta, redes, reseñas y cómo llegar. Se ve al escanear el QR de la mesa y la podés compartir en tu Instagram."
       />
       <LinksForm
-        initial={{ enabled: s?.linksEnabled ?? false, theme: s && isLinkTheme(s.linksTheme) ? s.linksTheme : "dark", links: readLinks(s) }}
+        initial={{ enabled: s?.linksEnabled ?? false, theme: s && isLinkTheme(s.linksTheme) ? s.linksTheme : "dark", links: readLinks(s, hasBooking) }}
         venue={{ name: tenant.name, tagline: s?.tagline ?? null, logoUrl: s?.logoUrl ?? null, coverImageUrl: s?.coverImageUrl ?? null }}
         publicUrl={`${base}/${tenant.slug}/enlaces`}
         hasBooking={hasBooking}
+        bookingUrl={`${base}/${tenant.slug}/reservar`}
         country={s?.country ?? "AR"}
+        slug={tenant.slug}
       />
     </>
   );

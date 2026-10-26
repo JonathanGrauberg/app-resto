@@ -40,15 +40,16 @@ export default async function TableEntryPage({ params, searchParams }: PageProps
   // Página de enlaces (si el local la activó): lo primero que se ve; "Ver la carta" entra a la mesa.
   const s = tenant.settings;
   if (s?.linksEnabled && (await searchParams).carta !== "1") {
+    const hasBooking = await hasModule(tenant.id, "RESERVAS");
     return (
       <>
         <QrIntro slug={tenant.slug} />
         <LinksPage
           venue={{ name: tenant.name, tagline: s.tagline, logoUrl: s.logoUrl, coverImageUrl: s.coverImageUrl }}
-          links={readLinks(s)}
+          links={readLinks(s, hasBooking)}
           theme={isLinkTheme(s.linksTheme) ? s.linksTheme : "dark"}
           cartaHref={`/${tenant.slug}/m/${qrToken}?carta=1`}
-          bookingHref={(await hasModule(tenant.id, "RESERVAS")) ? `/${tenant.slug}/reservar` : null}
+          bookingHref={hasBooking ? `/${tenant.slug}/reservar` : null}
           country={s.country}
         />
       </>

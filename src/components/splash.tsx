@@ -26,11 +26,16 @@ export function EntrySplash() {
     let seen = false;
     try {
       seen = sessionStorage.getItem("yatay:splash") === "1";
-      sessionStorage.setItem("yatay:splash", "1");
     } catch {}
     if (seen || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const t0 = setTimeout(() => setPhase("show"), 0);
-    const t1 = setTimeout(() => setPhase("fade"), 900);
+    // Se marca como vista al terminar (si se marcara antes, el doble efecto de desarrollo la saltearía).
+    const t1 = setTimeout(() => {
+      try {
+        sessionStorage.setItem("yatay:splash", "1");
+      } catch {}
+      setPhase("fade");
+    }, 900);
     const t2 = setTimeout(() => setPhase("gone"), 1400);
     return () => [t0, t1, t2].forEach(clearTimeout);
   }, []);
