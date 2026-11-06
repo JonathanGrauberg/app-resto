@@ -6,7 +6,8 @@ import { db } from "@/lib/db";
 import { currentDevice, lockMinutesLeft, registerPinFailure, registerPinSuccess, LOCK_MINUTES } from "@/lib/auth/devices";
 import { verifySecret } from "@/lib/auth/password";
 import { createSession, destroySession } from "@/lib/auth/session";
-import { staffHome } from "@/lib/auth/permissions";
+import { ADMIN_ROLES, hasRole, staffHome } from "@/lib/auth/permissions";
+import { redeemProCode } from "@/lib/pro";
 
 export type LoginState = { error?: string } | undefined;
 
@@ -14,6 +15,8 @@ const credentials = z.object({
   email: z.email("Email no válido").transform((v) => v.trim().toLowerCase()),
   password: z.string().min(1, "Ingresá la contraseña"),
   next: z.string().optional(),
+  /** Código PRO opcional: se activa apenas entra (solo dueño o admin del local). */
+  code: z.string().trim().max(20).optional(),
 });
 
 /** Solo permite redirecciones internas. */
@@ -24,7 +27,7 @@ function safeNext(next?: string) {
 export async function loginWithPassword(_: LoginState, formData: FormData): Promise<LoginState> {
   const parsed = credentials.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
-  const { email, password, next } = parsed.data;
+  const { email, password, next, code } = parsed.data;
 
   const user = await db.user.findUnique({
     where: { email },
@@ -49,6 +52,11 @@ export async function loginWithPassword(_: LoginState, formData: FormData): Prom
     membershipId: membership?.id,
     kind: "password",
   });
+
+  if (code && membership && hasRole(membership, ADMIN_ROLES)) {
+    const r = await redeemProCode(membership.tenantId, code);
+    redirect(`/admin/plan?pro=${r.ok ? "1" : "0"}`);
+  }
 
   redirect(safeNext(next) ?? (membership ? staffHome(membership.role) : "/platform"));
 }

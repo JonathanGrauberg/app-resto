@@ -7,7 +7,8 @@ import { Badge, Card } from "@/components/ui/card";
 import { requirePlatformAdmin } from "@/lib/auth/guards";
 import { BILLING_LABEL, BILLING_TONE } from "@/lib/subscription";
 import { normalize } from "@/lib/format";
-import { planOf } from "@/lib/plans";
+import { planOf, PRO_PLAN_ID } from "@/lib/plans";
+import { ProCrown } from "@/components/pro-badge";
 import { tenantsOverview } from "@/lib/platform";
 import { COUNTRIES, formatMoney } from "@/lib/region";
 
@@ -33,7 +34,11 @@ export default async function LocalesPage({ searchParams }: PageProps<"/platform
             ? !t.active
             : estado === "vencidos"
               ? t.billing.kind === "overdue"
-              : t.billing.kind === "trial")),
+              : estado === "vip"
+                ? t.billing.kind === "vip"
+                : estado === "registro"
+                  ? t.source === "registro"
+                  : t.billing.kind === "trial")),
   );
 
   return (
@@ -73,6 +78,8 @@ export default async function LocalesPage({ searchParams }: PageProps<"/platform
           <option value="suspendidos">Solo suspendidos</option>
           <option value="vencidos">Pago vencido</option>
           <option value="prueba">En prueba</option>
+          <option value="vip">VIP</option>
+          <option value="registro">Se registraron solos</option>
         </select>
         <button className="h-10 rounded-xl bg-ink px-4 text-sm font-medium text-bg">Filtrar</button>
       </form>
@@ -89,7 +96,11 @@ export default async function LocalesPage({ searchParams }: PageProps<"/platform
                   <div className="flex flex-wrap items-center gap-1.5">
                     <p className="font-semibold">{t.name}</p>
                     <Badge>{COUNTRIES[t.region.country].label}</Badge>
-                    <Badge tone="brand">{plan ? plan.label : `${t.modules.length} módulos`}</Badge>
+                    <Badge tone="brand">
+                      {plan?.id === PRO_PLAN_ID && <ProCrown className="size-3.5" />}
+                      {plan ? plan.label : `${t.modules.length} módulos`}
+                    </Badge>
+                    {t.source === "registro" && <Badge>Registro web</Badge>}
                     {!t.active && <Badge tone="danger">Suspendido</Badge>}
                     {t.active && t.billing.kind !== "free" && (
                       <Badge tone={BILLING_TONE[t.billing.kind]}>{BILLING_LABEL[t.billing.kind]}</Badge>
@@ -98,6 +109,7 @@ export default async function LocalesPage({ searchParams }: PageProps<"/platform
                   </div>
                   <p className="truncate text-sm text-muted">
                     /{t.slug}
+                    {t.city && ` · ${t.city}`}
                     {t.owners[0] && ` · ${t.owners[0].name}${t.owners[0].email ? ` · ${t.owners[0].email}` : ""}`}
                   </p>
                 </div>

@@ -6,7 +6,8 @@ import { fail, optionalText, priceInput, success, type ActionState } from "@/lib
 import { requirePlatformAdmin } from "@/lib/auth/guards";
 import { addMonths, nextPeriodStart, PAYMENT_METHODS } from "@/lib/subscription";
 import { db } from "@/lib/db";
-import { PLANS } from "@/lib/plans";
+import { PLANS, planById, PRO_PLAN_ID } from "@/lib/plans";
+import { enablePlanModules } from "@/lib/pro";
 import { regionOf } from "@/lib/region";
 
 const isDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
@@ -102,5 +103,15 @@ export async function deletePayment(tenantId: string, paymentId: string) {
 export async function setSubscriptionCancelled(tenantId: string, cancelled: boolean) {
   await requirePlatformAdmin();
   await db.subscription.update({ where: { tenantId }, data: { cancelledAt: cancelled ? new Date() : null } });
+  refresh(tenantId);
+}
+
+/** VIP: tiene el plan Pro sin pagar y sin vencimiento (conocidos, locales piloto). Quitarlo no le apaga módulos. */
+export async function setVip(tenantId: string, vip: boolean) {
+  await requirePlatformAdmin();
+  const region = await regionFor(tenantId);
+  const data = vip ? { vip: true, planId: PRO_PLAN_ID, cancelledAt: null } : { vip: false };
+  await db.subscription.upsert({ where: { tenantId }, update: data, create: { tenantId, currency: region.currency, ...data } });
+  if (vip) await enablePlanModules(tenantId, planById(PRO_PLAN_ID)!);
   refresh(tenantId);
 }

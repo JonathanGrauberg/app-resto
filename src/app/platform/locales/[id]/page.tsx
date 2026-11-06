@@ -166,6 +166,10 @@ export default async function TenantPage({ params, searchParams }: PageProps<"/p
                 paidUntil: t.subscription.paidUntil?.toISOString() ?? null,
                 notes: t.subscription.notes,
                 cancelled: !!t.subscription.cancelledAt,
+                vip: t.subscription.vip,
+                source: t.subscription.source,
+                city: t.subscription.city,
+                contactPhone: t.subscription.contactPhone,
               }
             }
             payments={t.billingPayments.map((p) => ({

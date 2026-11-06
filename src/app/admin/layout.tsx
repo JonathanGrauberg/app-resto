@@ -8,11 +8,12 @@ import { getRegion } from "@/lib/region-server";
 import { requireTenantRole } from "@/lib/auth/guards";
 import { ADMIN_ROLES, rolesOf } from "@/lib/auth/permissions";
 import { getEnabledModules } from "@/lib/modules";
+import { tenantPlan } from "@/lib/pro";
 import { staffChannel } from "@/lib/realtime/server";
 
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   const { tenant, user, membership } = await requireTenantRole(ADMIN_ROLES);
-  const [modules, region] = await Promise.all([getEnabledModules(tenant.id), getRegion(tenant.id)]);
+  const [modules, region, plan] = await Promise.all([getEnabledModules(tenant.id), getRegion(tenant.id), tenantPlan(tenant.id)]);
 
   const nav: NavItem[] = [
     { href: "/admin", label: "Inicio", icon: "dashboard" },
@@ -25,6 +26,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
     ...(modules.has("MURO") ? [{ href: "/admin/muro", label: "Chamullame", icon: "chamullame" } as const] : []),
     ...(modules.has("COMPRAS") ? [{ href: "/admin/compras", label: "Compras", icon: "compras" } as const] : []),
     ...(modules.has("BI") ? [{ href: "/admin/metricas", label: "Métricas", icon: "metricas" } as const] : []),
+    { href: "/admin/plan", label: plan.pro ? "Plan PRO" : "Tu plan", icon: "plan" },
     { href: "/admin/ajustes", label: "Ajustes", icon: "ajustes" },
   ];
 
@@ -34,6 +36,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
       subtitle="Administración"
       nav={nav}
       userName={user.name}
+      pro={plan.pro ? { vip: plan.vip } : null}
       badge={
         modules.has("MURO") && (
           <Link href="/admin/muro" title="Chamullame" className="transition-transform hover:-rotate-6 hover:scale-110">

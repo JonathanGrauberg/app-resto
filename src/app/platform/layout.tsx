@@ -11,6 +11,7 @@ export default async function PlatformLayout({ children }: LayoutProps<"/platfor
       nav={[
         { href: "/platform", label: "Resumen", icon: "dashboard" },
         { href: "/platform/locales", label: "Locales", icon: "tenants" },
+        { href: "/platform/codigos", label: "Códigos PRO", icon: "codigos" },
         { href: "/platform/planes", label: "Planes", icon: "planes" },
       ]}
       userName={user.name}

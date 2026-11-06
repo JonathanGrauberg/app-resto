@@ -24,6 +24,22 @@ export const BRAND = {
 } as const;
 
 /**
+ * Contacto comercial: adonde escribe un local que quiere el plan Pro (hasta tener Mercado Pago).
+ * Se configura con NEXT_PUBLIC_SALES_WHATSAPP (número con código de país, solo dígitos, ej. 5493435551234).
+ */
+export const SALES = {
+  whatsapp: (process.env.NEXT_PUBLIC_SALES_WHATSAPP ?? "").replace(/\D/g, ""),
+} as const;
+
+/** Link de WhatsApp a ventas con un mensaje ya escrito (o null si no está configurado el número). */
+export function salesWhatsApp(text: string) {
+  return SALES.whatsapp ? `https://wa.me/${SALES.whatsapp}?text=${encodeURIComponent(text)}` : null;
+}
+
+/** Dorado de la coronita del plan Pro. */
+export const PRO_GOLD = "#fcc107";
+
+/**
  * Chamullame: la app social (pantalla gigante, chat de mesa, chamullos entre mesas) que se suma a Yatay
  * o se contrata sola (boliches, eventos, casamientos). En el código es el módulo MURO.
  */

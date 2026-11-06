@@ -3,6 +3,7 @@ import { LogOut } from "lucide-react";
 import { logout } from "@/app/login/actions";
 import { BrandMark } from "./brand-mark";
 import { NavLinks, type NavIcon } from "./nav-links";
+import { ProBadge } from "./pro-badge";
 import { EntrySplash } from "./splash";
 
 export type NavItem = { href: string; label: string; icon: NavIcon };
@@ -17,6 +18,7 @@ export function AppShell({
   nav,
   userName,
   badge,
+  pro,
   children,
 }: {
   title: string;
@@ -25,6 +27,8 @@ export function AppShell({
   userName: string;
   /** Algo junto al nombre del local (ej. el logo de Chamullame si lo tienen). */
   badge?: React.ReactNode;
+  /** Plan Pro: coronita y "Plan PRO" bajo el nombre del local (con "VIP" si lo es). */
+  pro?: { vip: boolean } | null;
   children: React.ReactNode;
 }) {
   return (
@@ -39,6 +43,11 @@ export function AppShell({
             <div className="min-w-0">
               <p className="truncate text-lg font-semibold">{title}</p>
               {subtitle && <p className="truncate text-xs text-muted">{subtitle}</p>}
+              {pro && (
+                <Link href="/admin/plan" className="mt-1.5 inline-block">
+                  <ProBadge vip={pro.vip} />
+                </Link>
+              )}
             </div>
             {badge}
           </div>
@@ -60,7 +69,7 @@ export function AppShell({
             <BrandMark variant="icon" className="h-8" />
             <div className="min-w-0">
             <p className="truncate font-semibold">{title}</p>
-            {subtitle && <p className="truncate text-xs text-muted">{subtitle}</p>}
+            {pro ? <ProBadge vip={pro.vip} className="mt-0.5" /> : subtitle && <p className="truncate text-xs text-muted">{subtitle}</p>}
             </div>
           </div>
           <form action={logout}>

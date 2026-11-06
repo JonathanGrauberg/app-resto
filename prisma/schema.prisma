@@ -986,8 +986,38 @@ model Subscription {
   providerRef String?
   notes       String?
   cancelledAt DateTime?
+  /// VIP: tiene su plan sin pagar y sin vencimiento (conocidos, locales piloto).
+  vip         Boolean         @default(false)
+  /// Por dónde llegó: "registro" (se anotó solo en la web), "plataforma" (alta manual).
+  source      String?
+  /// Contacto comercial (lo carga el local al registrarse).
+  contactPhone String?
+  city        String?
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
+}
+
+/// Código PRO: lo genera el equipo de Yatay después de cerrar la venta y el local lo ingresa
+/// para activar su plan. Un solo uso y vence a los pocos minutos/horas. Se guarda solo el hash.
+model ProCode {
+  id           String    @id @default(cuid())
+  codeHash     String    @unique
+  /// Plan que activa (src/lib/plans.ts).
+  planId       String
+  /// Meses incluidos (null = sin vencimiento).
+  months       Int?
+  /// Además lo marca VIP (sin pagar).
+  vip          Boolean   @default(false)
+  /// Si se indica, solo ese local puede usarlo.
+  tenantId     String?
+  note         String?
+  expiresAt    DateTime
+  usedAt       DateTime?
+  usedTenantId String?
+  createdBy    String?
+  createdAt    DateTime  @default(now())
+
+  @@index([createdAt])
 }
 
 /// Un pago recibido de un local. Extiende `paidUntil` de su suscripción.

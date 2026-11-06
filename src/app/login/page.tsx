@@ -24,6 +24,12 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           <LoginForm next={typeof next === "string" ? next : undefined} />
         </Card>
         <p className="text-center text-sm text-muted">
+          ¿Tu local todavía no usa {BRAND.name}?{" "}
+          <Link href="/registro" className="font-medium text-brand">
+            Crealo gratis
+          </Link>
+        </p>
+        <p className="text-center text-sm text-muted">
           ¿Sos mozo, cocina o bar?{" "}
           <Link href="/login/pin" className="inline-flex items-center gap-1 font-medium text-brand">
             <KeyRound className="size-4" aria-hidden /> Entrar con PIN

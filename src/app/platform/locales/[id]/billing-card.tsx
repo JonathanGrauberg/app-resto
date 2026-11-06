@@ -9,9 +9,21 @@ import { BILLING_LABEL, BILLING_TONE, PAYMENT_METHODS, type BillingState } from 
 import { PLANS } from "@/lib/plans";
 import { formatMoney, isRoundCurrency, type Region } from "@/lib/region";
 import { useFormAction } from "@/lib/use-form-action";
-import { deletePayment, registerPayment, saveSubscription, setSubscriptionCancelled } from "../../billing-actions";
+import { ProCrown } from "@/components/pro-badge";
+import { deletePayment, registerPayment, saveSubscription, setSubscriptionCancelled, setVip } from "../../billing-actions";
 
-type Sub = { planId: string | null; priceCents: number; trialEndsAt: string | null; paidUntil: string | null; notes: string | null; cancelled: boolean } | null;
+type Sub = {
+  planId: string | null;
+  priceCents: number;
+  trialEndsAt: string | null;
+  paidUntil: string | null;
+  notes: string | null;
+  cancelled: boolean;
+  vip: boolean;
+  source: string | null;
+  city: string | null;
+  contactPhone: string | null;
+} | null;
 type Pay = { id: string; amountCents: number; method: string; months: number; periodTo: string; paidAt: string; reference: string | null; recordedBy: string | null };
 
 const day = (iso: string) => new Date(iso).toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
@@ -37,7 +49,9 @@ export function BillingCard({ tenantId, region, sub, state, payments, today }: {
           ? state.since
             ? `Venció el ${day(state.since.toISOString())} · hace ${state.days} días`
             : "Nunca pagó"
-          : state.kind === "free"
+          : state.kind === "vip"
+            ? "VIP: plan Pro sin cargo y sin vencimiento"
+            : state.kind === "free"
             ? "No se le cobra (demo o cortesía)"
             : state.kind === "cancelled"
               ? "No se le cobra más"
@@ -55,6 +69,26 @@ export function BillingCard({ tenantId, region, sub, state, payments, today }: {
           {plan ? `Plan ${plan.label}` : "Sin plan"} · <strong>{sub.priceCents ? `${money(sub.priceCents)} por mes` : "sin precio"}</strong>
         </p>
       )}
+      {sub && (sub.source === "registro" || sub.contactPhone || sub.city) && (
+        <p className="mt-1 text-sm text-muted">
+          {sub.source === "registro" ? "Se registró solo en la web" : "Alta manual"}
+          {sub.city && ` · ${sub.city}`}
+          {sub.contactPhone && (
+            <>
+              {" · "}
+              <a href={`https://wa.me/${sub.contactPhone.replace(/\D/g, "")}`} target="_blank" rel="noopener" className="font-medium text-brand underline-offset-2 hover:underline">
+                WhatsApp {sub.contactPhone}
+              </a>
+            </>
+          )}
+        </p>
+      )}
+
+      <form action={setVip.bind(null, tenantId, !sub?.vip)} className="mt-3">
+        <Button type="submit" variant="secondary" size="sm" className="w-full">
+          <ProCrown /> {sub?.vip ? "Quitar VIP" : "Dar VIP (Pro gratis, sin vencimiento)"}
+        </Button>
+      </form>
 
       <details className="group mt-3 rounded-xl border border-line" open={!sub}>
         <summary className="cursor-pointer px-3 py-2 text-sm font-medium">Plan, precio y prueba</summary>

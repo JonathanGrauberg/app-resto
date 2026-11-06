@@ -9,6 +9,8 @@ import {
   Building2,
   CalendarDays,
   ChefHat,
+  Crown,
+  KeyRound,
   LayoutDashboard,
   LayoutGrid,
   MessagesSquare,
@@ -42,6 +44,8 @@ const ICONS = {
   muro: MessagesSquare,
   enlaces: Link2,
   chamullame: ChamullameMark,
+  plan: Crown,
+  codigos: KeyRound,
 };
 
 export type NavIcon = keyof typeof ICONS;

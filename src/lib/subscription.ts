@@ -20,12 +20,13 @@ export const PAYMENT_METHODS = {
 } as const;
 export type PaymentMethod = keyof typeof PAYMENT_METHODS;
 
-type Sub = { priceCents: number; trialEndsAt: Date | null; paidUntil: Date | null; cancelledAt: Date | null } | null;
+type Sub = { priceCents: number; trialEndsAt: Date | null; paidUntil: Date | null; cancelledAt: Date | null; vip?: boolean } | null;
 
 export type BillingState =
   | { kind: "none" }
   | { kind: "cancelled" }
   | { kind: "free" }
+  | { kind: "vip" }
   | { kind: "active"; until: Date; daysLeft: number }
   | { kind: "trial"; until: Date; daysLeft: number }
   | { kind: "overdue"; since: Date | null; days: number };
@@ -33,6 +34,7 @@ export type BillingState =
 export function billingState(sub: Sub, now = Date.now()): BillingState {
   if (!sub) return { kind: "none" };
   if (sub.cancelledAt) return { kind: "cancelled" };
+  if (sub.vip) return { kind: "vip" };
   if (sub.paidUntil && sub.paidUntil.getTime() > now) return { kind: "active", until: sub.paidUntil, daysLeft: Math.ceil((sub.paidUntil.getTime() - now) / DAY) };
   if (sub.trialEndsAt && sub.trialEndsAt.getTime() > now && !sub.paidUntil) {
     return { kind: "trial", until: sub.trialEndsAt, daysLeft: Math.ceil((sub.trialEndsAt.getTime() - now) / DAY) };
@@ -46,6 +48,7 @@ export const BILLING_LABEL: Record<BillingState["kind"], string> = {
   none: "Sin configurar",
   cancelled: "Dado de baja",
   free: "Sin cargo",
+  vip: "VIP",
   active: "Al día",
   trial: "En prueba",
   overdue: "Vencido",
@@ -55,6 +58,7 @@ export const BILLING_TONE: Record<BillingState["kind"], "ok" | "warn" | "danger"
   none: "neutral",
   cancelled: "neutral",
   free: "neutral",
+  vip: "ok",
   active: "ok",
   trial: "warn",
   overdue: "danger",

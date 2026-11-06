@@ -53,6 +53,10 @@ export async function tenantsOverview() {
       /** Precio mensual de la suscripción (centavos de su moneda; 0 = sin cargo o sin configurar). */
       priceCents: t.subscription && !t.subscription.cancelledAt ? t.subscription.priceCents : 0,
       address: t.settings?.address ?? null,
+      /** Por dónde llegó ("registro" = se anotó solo en la web) y contacto que dejó. */
+      source: t.subscription?.source ?? null,
+      city: t.subscription?.city ?? null,
+      phone: t.subscription?.contactPhone ?? null,
       modules: t.modules.filter((m) => m.enabled && (!m.expiresAt || m.expiresAt.getTime() > now)).map((m) => m.module),
       expiring: t.modules.filter((m) => m.enabled && m.expiresAt && m.expiresAt.getTime() > now && m.expiresAt.getTime() < now + 14 * DAY),
       owners: t.memberships.map((m) => ({ name: m.user.name, email: m.user.email })),
