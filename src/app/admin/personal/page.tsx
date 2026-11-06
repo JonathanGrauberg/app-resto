@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronRight, Plus } from "lucide-react";
+import { ChevronRight, Plus, ShieldAlert, Smartphone } from "lucide-react";
 import { PageHeader } from "@/components/app-shell";
 import { ButtonLink } from "@/components/ui/button";
 import { Badge, Card } from "@/components/ui/card";
 import { FormSuccess } from "@/components/ui/field";
+import { devicesOf } from "@/lib/auth/devices";
 import { requireTenantRole } from "@/lib/auth/guards";
 import { ADMIN_ROLES, ROLE_LABEL, ROLE_ORDER, canManageRoles, hasRole, rolesOf, sortRoles } from "@/lib/auth/permissions";
 import { cn } from "@/lib/format";
@@ -16,14 +17,16 @@ export default async function AdminPersonalPage({ searchParams }: PageProps<"/ad
   const { tdb, tenant, membership: me } = await requireTenantRole(ADMIN_ROLES);
   const { ok } = await searchParams;
 
-  const [members, open] = await Promise.all([
+  const [members, open, devices] = await Promise.all([
     tdb.membership.findMany({ include: { user: { select: { name: true, email: true, passwordHash: true } } } }),
     // Mesas abiertas con mozo: para mostrar quién está libre.
     tdb.tableSession.findMany({
       where: { status: { not: "CLOSED" }, waiterId: { not: null } },
       include: { table: { select: { number: true, groupId: true } } },
     }),
+    devicesOf(tenant.id),
   ]);
+  const locks = devices.reduce((n, d) => n + d.pinLocks.length, 0);
   const tablesOf = new Map<string, string[]>();
   for (const s of open) {
     tablesOf.set(s.waiterId!, [...(tablesOf.get(s.waiterId!) ?? []), await tableLabelOf(tdb, s.table)]);
@@ -41,13 +44,30 @@ export default async function AdminPersonalPage({ searchParams }: PageProps<"/ad
     <>
       <PageHeader
         title="Personal"
-        description={`Mozos, cocina y bar entran con PIN en /login/pin/${tenant.slug}`}
+        description="Mozos, cocina y bar entran con su PIN desde los equipos vinculados del local."
         actions={
-          <ButtonLink href="/admin/personal/nuevo">
-            <Plus className="size-4" aria-hidden /> Nueva persona
-          </ButtonLink>
+          <div className="flex flex-wrap gap-2">
+            <ButtonLink href="/admin/personal/equipos" variant="secondary">
+              <Smartphone className="size-4" aria-hidden /> Equipos ({devices.length})
+            </ButtonLink>
+            <ButtonLink href="/admin/personal/nuevo">
+              <Plus className="size-4" aria-hidden /> Nueva persona
+            </ButtonLink>
+          </div>
         }
       />
+      {locks > 0 && (
+        <Link href="/admin/personal/equipos" className="mb-4 flex items-center gap-2 rounded-xl bg-danger-soft px-4 py-3 text-sm font-medium text-danger">
+          <ShieldAlert className="size-4 shrink-0" aria-hidden />
+          {locks === 1 ? "Hubo un bloqueo" : `Hubo ${locks} bloqueos`} por PIN incorrectos en las últimas 24 h. Ver equipos
+        </Link>
+      )}
+      {devices.length === 0 && (
+        <Link href="/admin/personal/equipos" className="mb-4 flex items-center gap-2 rounded-xl bg-warn-soft px-4 py-3 text-sm font-medium text-warn">
+          <Smartphone className="size-4 shrink-0" aria-hidden />
+          Todavía no vinculaste ningún equipo: sin eso, nadie puede entrar con PIN. Vincular ahora
+        </Link>
+      )}
       {typeof ok === "string" && (
         <div className="mb-6">
           <FormSuccess message={ok} />

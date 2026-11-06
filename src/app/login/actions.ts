@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { currentDevice, lockMinutesLeft, registerPinFailure, registerPinSuccess, LOCK_MINUTES } from "@/lib/auth/devices";
 import { verifySecret } from "@/lib/auth/password";
 import { createSession, destroySession } from "@/lib/auth/session";
 import { staffHome } from "@/lib/auth/permissions";
@@ -66,14 +67,27 @@ export async function loginWithPin(_: LoginState, formData: FormData): Promise<L
   const membership = await db.membership.findFirst({
     where: { id: membershipId, active: true, tenant: { slug, active: true } },
   });
-  if (!membership || !(await verifySecret(pin, membership.pinHash))) {
-    return { error: "PIN incorrecto" };
+  if (!membership) return { error: "PIN incorrecto" };
+
+  // El PIN solo vale desde un equipo vinculado por el admin.
+  const device = await currentDevice(membership.tenantId);
+  if (!device) return { error: "Este equipo no está vinculado. Pedile al encargado el QR de acceso del personal." };
+
+  const locked = await lockMinutesLeft(device.id, membership.id);
+  if (locked) return { error: `Demasiados intentos. Probá de nuevo en ${locked === 1 ? "1 minuto" : `${locked} minutos`}.` };
+
+  if (!(await verifySecret(pin, membership.pinHash))) {
+    const left = await registerPinFailure(device.id, membership.id);
+    if (left === 0) return { error: `Demasiados intentos: quedó bloqueado ${LOCK_MINUTES} minutos en este equipo. Le avisamos al encargado.` };
+    return { error: left <= 2 ? `PIN incorrecto. Te ${left === 1 ? "queda 1 intento" : `quedan ${left} intentos`}.` : "PIN incorrecto" };
   }
 
+  await registerPinSuccess(device.id, membership.id);
   await createSession({
     userId: membership.userId,
     tenantId: membership.tenantId,
     membershipId: membership.id,
+    deviceId: device.id,
     kind: "pin",
   });
 

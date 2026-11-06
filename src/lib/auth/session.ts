@@ -18,6 +18,8 @@ export async function createSession(opts: {
   userId: string;
   tenantId?: string | null;
   membershipId?: string | null;
+  /** Equipo vinculado (entradas con PIN). */
+  deviceId?: string | null;
   kind: keyof typeof TTL;
 }) {
   const token = randomBytes(32).toString("base64url");
@@ -29,6 +31,7 @@ export async function createSession(opts: {
       userId: opts.userId,
       tenantId: opts.tenantId ?? null,
       membershipId: opts.membershipId ?? null,
+      deviceId: opts.deviceId ?? null,
       expiresAt,
     },
   });

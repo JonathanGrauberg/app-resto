@@ -63,6 +63,8 @@ model Tenant {
   cartItems      CartItem[]
   payments       Payment[]
   cashShifts     CashShift[]
+  staffDevices   StaffDevice[]
+  devicePairings DevicePairing[]
 }
 
 /// Cómo se reparten los pedidos para preparar.
@@ -201,10 +203,57 @@ model AuthSession {
   /// Tenant activo de la sesión (null = panel de plataforma).
   tenantId     String?
   membershipId String?
+  /// Equipo vinculado desde el que se entró con PIN (al quitarlo se cierran sus sesiones).
+  deviceId     String?
   expiresAt    DateTime
   createdAt    DateTime @default(now())
 
   @@index([userId])
+  @@index([deviceId])
+}
+
+/// Equipo autorizado por el admin para entrar con PIN (celular de un mozo, tablet de la barra).
+/// Sin un equipo vinculado el PIN no sirve: el código del local es público (está en la carta).
+model StaffDevice {
+  id         String    @id @default(cuid())
+  tenantId   String
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name       String
+  /// sha256 del token guardado en la cookie del equipo.
+  tokenHash  String    @unique
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+
+  pinLocks PinLock[]
+
+  @@index([tenantId])
+}
+
+/// QR de un solo uso para vincular un equipo. Vence a los pocos minutos.
+model DevicePairing {
+  id        String    @id @default(cuid())
+  tenantId  String
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([tenantId])
+}
+
+/// PIN incorrectos de una persona en un equipo. A los 5 se bloquea un rato.
+model PinLock {
+  deviceId     String
+  device       StaffDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  membershipId String
+  failures     Int         @default(0)
+  lockedUntil  DateTime?
+  /// Último bloqueo (para avisarle al admin).
+  lockedAt     DateTime?
+
+  @@id([deviceId, membershipId])
 }
 
 // ─────────────────────────────────────────────────────────────

@@ -1,32 +1,32 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import { ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { Input, Label } from "@/components/ui/field";
+import { pairedTenants } from "@/lib/auth/devices";
+import { NotPaired } from "./not-paired";
 
 export const metadata: Metadata = { title: "Entrar con PIN" };
 
-async function goToTenant(formData: FormData) {
-  "use server";
-  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
-  if (slug) redirect(`/login/pin/${encodeURIComponent(slug)}`);
-}
+/** Entrada con PIN: va directo al local al que está vinculado este equipo. Sin equipo vinculado, no hay PIN. */
+export default async function PinTenantPage() {
+  const venues = await pairedTenants();
+  if (venues.length === 1) redirect(`/login/pin/${venues[0].slug}`);
+  if (!venues.length) return <NotPaired />;
 
-/** Paso 1: identificar el local. En la PWA instalada se recordará el último usado. */
-export default function PinTenantPage() {
   return (
     <main className="flex flex-1 items-center justify-center px-4 py-10">
-      <Card className="w-full max-w-sm p-5 sm:p-6">
-        <form action={goToTenant} className="space-y-4">
-          <div>
-            <Label htmlFor="slug">Código del local</Label>
-            <Input id="slug" name="slug" placeholder="ej. la-casona" autoCapitalize="none" required />
-          </div>
-          <Button type="submit" className="w-full" size="lg">
-            Continuar
-          </Button>
-        </form>
-      </Card>
+      <div className="w-full max-w-sm space-y-3">
+        <h1 className="text-center text-xl font-semibold">¿A qué local entrás?</h1>
+        <Card className="divide-y divide-line">
+          {venues.map((v) => (
+            <Link key={v.slug} href={`/login/pin/${v.slug}`} className="flex items-center justify-between p-4 font-medium hover:bg-bg">
+              {v.name}
+              <ChevronRight className="size-4 text-muted" aria-hidden />
+            </Link>
+          ))}
+        </Card>
+      </div>
     </main>
   );
 }
