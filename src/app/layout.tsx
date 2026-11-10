@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { InlineScript } from "@/components/inline-script";
+import { InstallApp } from "@/components/install-app";
 import { BRAND } from "@/lib/brand";
 import "./globals.css";
 
@@ -36,7 +37,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <head>
         <InlineScript html={themeScript} />
       </head>
-      <body className="min-h-full flex flex-col font-sans">{children}</body>
+      <body className="min-h-full flex flex-col font-sans">
+        {children}
+        <InstallApp />
+      </body>
     </html>
   );
 }
