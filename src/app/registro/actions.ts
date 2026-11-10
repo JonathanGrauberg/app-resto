@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { intlPhone } from "@/lib/phone";
 import { hashSecret } from "@/lib/auth/password";
 import { createSession } from "@/lib/auth/session";
 import { BRAND } from "@/lib/brand";
@@ -32,13 +33,6 @@ const schema = z.object({
 });
 
 /** WhatsApp con código de país (+549… en Argentina, +34… en España), para poder escribirle directo. */
-function intlPhone(raw: string, country: string) {
-  let d = raw.replace(/\D/g, "");
-  if (country === "AR" && !d.startsWith("54")) d = `549${d.replace(/^0/, "")}`;
-  if (country === "ES" && !d.startsWith("34")) d = `34${d}`;
-  return `+${d}`;
-}
-
 /** "La Parrilla de Don José" → "la-parrilla-de-don-jose"; si está tomado, "-2", "-3"… */
 async function freeSlug(venue: string) {
   let base = normalize(venue)

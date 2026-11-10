@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowLeft, ExternalLink, PackageCheck } from "lucide-react";
 import { PageHeader } from "@/components/app-shell";
 import { Badge, Card } from "@/components/ui/card";
 import { FormSuccess } from "@/components/ui/field";
@@ -48,6 +48,12 @@ export default async function TenantPage({ params, searchParams }: PageProps<"/p
               className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line bg-surface px-3 text-sm font-medium hover:bg-bg"
             >
               <ExternalLink className="size-4" aria-hidden /> Ver carta
+            </Link>
+            <Link
+              href={`/platform/locales/${t.id}/entregar`}
+              className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line bg-surface px-3 text-sm font-medium hover:bg-bg"
+            >
+              <PackageCheck className="size-4" aria-hidden /> Entregar al cliente
             </Link>
             <form action={toggleTenantActive.bind(null, t.id, !t.active)}>
               <button
