@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Instrument_Serif } from "next/font/google";
-import { Check, MessageCircle, QrCode, Sparkles } from "lucide-react";
+import { Check, HandHeart, MessageCircle, MessagesSquare, QrCode, Sparkles, Timer, UtensilsCrossed } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 import { BANDS } from "@/components/landing/palette";
 import { ScrollStory } from "@/components/landing/scroll-story";
@@ -14,6 +14,30 @@ import { PLAN_FEATURES, planById, PRO_PLAN_ID, PUBLIC_PLAN_IDS } from "@/lib/pla
 const DEMO_SLUG = "parrilla-demo";
 
 const serif = Instrument_Serif({ weight: "400", style: ["normal", "italic"], subsets: ["latin"] });
+
+/** Lo que hace distinto a Yatay (sin nombrar a nadie: hablamos de lo nuestro). */
+const WHY = [
+  {
+    icon: UtensilsCrossed,
+    title: "Nace en la mesa",
+    text: "Otros sistemas empiezan en la caja. Yatay empieza donde está tu cliente: pide desde la mesa, el mozo se entera al toque y la cuenta se divide sin calculadora.",
+  },
+  {
+    icon: HandHeart,
+    title: "Gratis para arrancar, con gente de verdad",
+    text: "Te ayudamos a cargar la carta, pasamos por tu local y nos escribís directo por WhatsApp. Somos de Paraná, no un call center.",
+  },
+  {
+    icon: MessagesSquare,
+    title: "Tus mesas también se hablan",
+    text: "Con Chamullame las mesas chatean, se mandan un brindis y se sacan la foto del grupo. Algo que ningún sistema de gestión le da a tu bar.",
+  },
+  {
+    icon: Timer,
+    title: "Se aprende en una tarde",
+    text: "Sin cursos ni manuales: si tu equipo usa WhatsApp, usa Yatay. Cada uno entra con su PIN y ve solo lo que le toca.",
+  },
+] as const;
 
 function Title({ kicker, children, as: H = "h2" }: { kicker: string; children: React.ReactNode; as?: "h1" | "h2" }) {
   return (
@@ -105,6 +129,26 @@ export default function Home() {
             },
           ]}
         />
+
+        <section id="por-que" className="scroll-mt-16 px-4 pb-32 pt-16 sm:px-6" style={{ background: BANDS[0] }}>
+          <div className="mx-auto max-w-5xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#f2a48c]">Por qué {BRAND.name}</p>
+            <h2 className={`${serif.className} mt-3 max-w-3xl text-5xl leading-[1.02] text-balance sm:text-6xl`}>
+              Hecho para el local, <em>no para la oficina.</em>
+            </h2>
+            <div className="mt-14 grid gap-x-14 gap-y-10 sm:grid-cols-2">
+              {WHY.map(({ icon: Icon, title, text }) => (
+                <div key={title} className="flex gap-4 border-t border-[#f3ead9]/15 pt-6">
+                  <Icon className="mt-1 size-6 shrink-0 text-[#f2a48c]" aria-hidden />
+                  <div>
+                    <h3 className={`${serif.className} text-3xl leading-tight`}>{title}</h3>
+                    <p className="mt-2 max-w-md text-[15px] leading-relaxed text-[#f3ead9]/75">{text}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
 
         <section id="precios" className="relative scroll-mt-16 px-4 pb-28 pt-20 text-[#1f3a33] sm:px-6" style={{ background: BANDS[1] }}>
           <TornEdge color={BANDS[1]} seed={40} className="absolute inset-x-0 top-0 -translate-y-[70%]" />
