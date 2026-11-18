@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Filter, Search, X } from "lucide-react";
 import type { Allergen } from "@/generated/prisma/enums";
 import { Photo } from "@/components/mock-image";
@@ -42,18 +42,40 @@ export function MenuBrowser({
     [menu, query, excluded],
   );
 
-  // Resalta la categoría visible mientras se hace scroll.
+  // Resalta la categoría visible mientras se hace scroll: la última cuya sección ya pasó por
+  // debajo de la barra fija. Al llegar al final de la página se marca la última (si es corta,
+  // nunca llega arriba). Tras tocar un chip, se respeta ese chip mientras dura el scroll suave.
+  const pickedAt = useRef(0);
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries.filter((e) => e.isIntersecting);
-        if (visible[0]) setActiveCat(visible[0].target.id.replace("cat-", ""));
-      },
-      { rootMargin: "-140px 0px -60% 0px" },
-    );
-    document.querySelectorAll("[data-category]").forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      if (performance.now() - pickedAt.current < 1200) return;
+      const sections = Array.from(document.querySelectorAll<HTMLElement>("[data-category]"));
+      if (sections.length === 0) return;
+      const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
+      let current = sections[0];
+      if (atBottom) current = sections[sections.length - 1];
+      else for (const el of sections) if (el.getBoundingClientRect().top <= 160) current = el;
+      setActiveCat(current.id.replace("cat-", ""));
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
   }, [filtered]);
+
+  const pick = (id: string) => {
+    pickedAt.current = performance.now();
+    setActiveCat(id);
+  };
 
   const toggleAllergen = (a: Allergen) =>
     setExcluded((prev) => {
@@ -96,7 +118,7 @@ export function MenuBrowser({
           </button>
 
           {/* En PC las categorías van en la misma fila que el buscador */}
-          <CategoryChips cats={filtered} active={activeCat} className="ml-4 hidden flex-1 lg:block" />
+          <CategoryChips cats={filtered} active={activeCat} onPick={pick} className="ml-4 hidden flex-1 lg:block" />
         </div>
 
         {showFilters && (
@@ -132,7 +154,7 @@ export function MenuBrowser({
           </div>
         )}
 
-        <CategoryChips cats={filtered} active={activeCat} className="-mx-4 mt-2 sm:-mx-6 lg:hidden" rowClassName="px-4 sm:px-6" />
+        <CategoryChips cats={filtered} active={activeCat} onPick={pick} className="-mx-4 mt-2 sm:-mx-6 lg:hidden" rowClassName="px-4 sm:px-6" />
       </div>
 
       {filtered.length === 0 && (
@@ -209,11 +231,13 @@ function ProductCard({ product: p, onOpen }: { product: PublicProduct; onOpen: (
 function CategoryChips({
   cats,
   active,
+  onPick,
   className,
   rowClassName,
 }: {
   cats: { id: string; name: string }[];
   active?: string;
+  onPick: (id: string) => void;
   className?: string;
   rowClassName?: string;
 }) {
@@ -223,6 +247,7 @@ function CategoryChips({
         <a
           key={c.id}
           href={`#cat-${c.id}`}
+          onClick={() => onPick(c.id)}
           aria-current={active === c.id ? "true" : undefined}
           className={cn(
             "shrink-0 rounded-full px-3.5 py-1.5 text-sm transition-colors",
