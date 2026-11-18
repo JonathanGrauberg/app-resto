@@ -58,11 +58,28 @@ export async function createCategory(name: string): Promise<{ id: string; name: 
   return { id: created.id, name: created.name };
 }
 
+/** Nombre y portada de la categoría (la portada es opcional: sin ella, el hero usa la foto de un producto). */
 export async function renameCategory(id: string, _: ActionState, formData: FormData): Promise<ActionState> {
   const { tdb, tenant } = await auth();
-  const parsed = categorySchema.safeParse(Object.fromEntries(formData));
+  const parsed = categorySchema.safeParse({ name: formData.get("name"), description: formData.get("description") ?? "" });
   if (!parsed.success) return fail(parsed.error);
-  await tdb.category.update({ where: { id }, data: parsed.data });
+
+  const imageKey = String(formData.get("imageKey") ?? "");
+  const previous = await tdb.category.findUniqueOrThrow({ where: { id }, select: { imageUrl: true } });
+  let imageUrl: string | null | undefined; // undefined = no tocar
+  if (imageKey === "remove") imageUrl = null;
+  else if (imageKey) {
+    imageUrl = await confirmImage(tenant.id, imageKey);
+    if (!imageUrl) return { error: "La foto no se pudo verificar. Volvé a subirla." };
+  }
+
+  await tdb.category.update({
+    where: { id },
+    data: { name: parsed.data.name, ...(imageUrl === undefined ? {} : { imageUrl }) },
+  });
+  if (imageUrl !== undefined && previous.imageUrl && previous.imageUrl !== imageUrl) {
+    await deleteImageByUrl(tenant.id, previous.imageUrl);
+  }
   refresh(tenant.slug);
   return success("Guardado");
 }
@@ -87,7 +104,8 @@ export async function deleteCategory(id: string): Promise<ActionState> {
   const { tdb, tenant } = await auth();
   const count = await tdb.product.count({ where: { categoryId: id } });
   if (count > 0) return { error: "Mové o borrá sus productos antes de borrar la categoría" };
-  await tdb.category.delete({ where: { id } });
+  const c = await tdb.category.delete({ where: { id } });
+  await deleteImageByUrl(tenant.id, c.imageUrl);
   refresh(tenant.slug);
   return success("Categoría borrada");
 }

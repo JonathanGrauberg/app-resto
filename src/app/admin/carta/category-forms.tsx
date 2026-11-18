@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { ArrowDown, ArrowUp, Eye, EyeOff, Pencil, Trash2 } from "lucide-react";
+import { ImageUpload } from "@/components/image-upload";
+import { Photo } from "@/components/mock-image";
 import { Button } from "@/components/ui/button";
 import { ActionButton } from "@/components/ui/action-button";
 import { FormError, Input } from "@/components/ui/field";
@@ -17,6 +19,7 @@ import { useFormAction } from "@/lib/use-form-action";
 export function CategoryHeader({
   id,
   name,
+  imageUrl,
   visible,
   count,
   first,
@@ -24,6 +27,8 @@ export function CategoryHeader({
 }: {
   id: string;
   name: string;
+  /** Portada propia de la categoría para el hero de la carta (opcional). */
+  imageUrl: string | null;
   visible: boolean;
   count: number;
   first: boolean;
@@ -41,18 +46,40 @@ export function CategoryHeader({
   return (
     <div className="mb-3 flex flex-wrap items-center gap-2">
       {editing ? (
-        <form onSubmit={action} className="flex flex-1 flex-wrap items-center gap-2">
-          <Input name="name" defaultValue={name} autoFocus className="max-w-xs" aria-label="Nombre de la categoría" />
-          <Button type="submit" size="sm" disabled={pending}>
-            Guardar
-          </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>
-            Cancelar
-          </Button>
-          <FormError message={state?.error} />
+        <form onSubmit={action} className="w-full space-y-3 rounded-2xl border border-line bg-surface p-4">
+          <label className="block text-sm font-medium">
+            Nombre
+            <Input name="name" defaultValue={name} autoFocus className="mt-1 max-w-xs" />
+          </label>
+          <div>
+            <p className="text-sm font-medium">Portada de la categoría <span className="font-normal text-muted">(opcional)</span></p>
+            <p className="mb-2 text-xs text-muted">
+              Es la foto grande de arriba de la carta cuando aparece esta categoría. Si no subís ninguna, se usa la foto de un producto.
+            </p>
+            <ImageUpload
+              name="imageKey"
+              kind="cover"
+              initialUrl={imageUrl}
+              seed={id}
+              label={`Portada de ${name}`}
+              className="aspect-video w-full max-w-md rounded-xl"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="submit" size="sm" disabled={pending}>
+              Guardar
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>
+              Cancelar
+            </Button>
+            <FormError message={state?.error} />
+          </div>
         </form>
       ) : (
         <h2 className={cn("flex flex-1 items-center gap-2 text-lg font-semibold", !visible && "text-muted")}>
+          {imageUrl && (
+            <Photo src={imageUrl} seed={id} label={`Portada de ${name}`} hideIcon className="h-8 w-12 shrink-0 rounded-md" />
+          )}
           {name}
           <span className="text-sm font-normal text-muted">{count}</span>
           {!visible && <span className="rounded-full bg-ink/5 px-2 py-0.5 text-xs font-normal">Oculta</span>}
@@ -61,7 +88,7 @@ export function CategoryHeader({
 
       {!editing && (
         <div className="flex items-center gap-0.5 text-muted">
-          <IconBtn label="Renombrar" onClick={() => setEditing(true)}>
+          <IconBtn label="Editar nombre y portada" onClick={() => setEditing(true)}>
             <Pencil className="size-4" />
           </IconBtn>
           <ActionButton

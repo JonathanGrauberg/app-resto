@@ -45,6 +45,8 @@ export function MenuHero({
   const { formatPrice } = useRegion();
   const slides = menu.map((c) => ({
     category: c,
+    // Fondo: la portada propia de la categoría; si no tiene, la foto del destacado; si no, la del local.
+    image: c.imageUrl ?? null,
     // Destacado: el primer plato disponible con foto; si no hay, el primero disponible.
     featured:
       c.products.find((p) => p.available && p.imageUrl) ?? c.products.find((p) => p.available) ?? c.products[0],
@@ -108,10 +110,10 @@ export function MenuHero({
             )}
           >
             <Photo
-              src={s.featured?.imageUrl ?? venue.coverImageUrl}
+              src={s.image ?? s.featured?.imageUrl ?? venue.coverImageUrl}
               seed={s.featured?.id ?? s.category.id}
               kind={s.featured?.station === "BAR" ? "bar" : "kitchen"}
-              label={s.featured ? `${s.featured.name}` : s.category.name}
+              label={s.image || !s.featured ? s.category.name : s.featured.name}
               hideIcon
               priority={!hasCover && i === 0}
               className="size-full"
@@ -235,7 +237,7 @@ export function MenuHero({
                 )}
               >
                 <Photo
-                  src={s.featured?.imageUrl ?? venue.coverImageUrl}
+                  src={s.image ?? s.featured?.imageUrl ?? venue.coverImageUrl}
                   seed={s.featured?.id ?? s.category.id}
                   kind={s.featured?.station === "BAR" ? "bar" : "kitchen"}
                   fade="bottom"

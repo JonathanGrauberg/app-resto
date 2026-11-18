@@ -408,6 +408,8 @@ model Category {
   tenant      Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name        String
   description String?
+  /// Portada de la categoría en el hero de la carta (si no hay, se usa la foto de un producto).
+  imageUrl    String?
   sortOrder   Int     @default(0)
   visible     Boolean @default(true)
 

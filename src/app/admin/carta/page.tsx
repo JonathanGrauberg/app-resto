@@ -61,6 +61,7 @@ export default async function AdminCartaPage({ searchParams }: PageProps<"/admin
             <CategoryHeader
               id={c.id}
               name={c.name}
+              imageUrl={c.imageUrl}
               visible={c.visible}
               count={c.products.length}
               first={ci === 0}

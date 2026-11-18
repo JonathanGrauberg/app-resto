@@ -56,6 +56,7 @@ export async function getPublicMenu(tenantId: string) {
     .map((c) => ({
       id: c.id,
       name: c.name,
+      imageUrl: c.imageUrl,
       products: c.products.map((p) => ({
         id: p.id,
         name: p.name,
