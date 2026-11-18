@@ -74,9 +74,12 @@ export function MenuHero({
     { href: venue.websiteUrl, label: "Web", icon: Globe },
   ].filter((c) => c.href);
 
-  const choose = (i: number) => {
+  // Tocar una categoría la muestra arriba y baja directo a su sección de la carta.
+  const choose = (i: number, categoryId: string) => {
     setActive(i);
     setPaused(true);
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    document.getElementById(`cat-${categoryId}`)?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
   };
 
   return (
@@ -189,7 +192,17 @@ export function MenuHero({
           <div key={current.category.id} className="mt-7 max-w-xl animate-fade-up" aria-live="polite">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand">Categoría</p>
             <p className="mt-1 text-2xl font-bold sm:text-3xl">{current.category.name}</p>
-            {current.featured && (
+            {/* Con portada propia, la categoría se presenta sola (sin plato ni precio). */}
+            {current.image ? (
+              <div className="mt-4">
+                <a
+                  href={`#cat-${current.category.id}`}
+                  className="inline-flex h-11 items-center gap-1.5 rounded-full bg-ink px-5 text-sm font-semibold text-bg hover:bg-ink/90"
+                >
+                  Ver {current.category.name.toLowerCase()} <ArrowDown className="size-4" aria-hidden />
+                </a>
+              </div>
+            ) : current.featured && (
               <>
                 <p className="mt-3 text-sm text-ink/75 sm:text-base">
                   <span className="font-semibold text-ink">{current.featured.name}</span>
@@ -230,7 +243,7 @@ export function MenuHero({
                 key={s.category.id}
                 role="tab"
                 aria-selected={on}
-                onClick={() => choose(i + offset)}
+                onClick={() => choose(i + offset, s.category.id)}
                 className={cn(
                   "group relative aspect-[4/3] w-32 shrink-0 snap-start overflow-hidden rounded-xl text-left transition-all duration-300 sm:w-40 lg:w-48",
                   on ? "ring-2 ring-ink" : "opacity-70 grayscale hover:opacity-100 hover:grayscale-0",
