@@ -64,8 +64,8 @@ export function LinksForm({
             name="linksEnabled"
             checked={enabled}
             onChange={(e) => setEnabled(e.target.checked)}
-            label="Mostrar esta página al escanear el QR de la mesa"
-            description="Apagada, el QR abre la carta directo."
+            label="Página de enlaces activa"
+            description="Para tu Instagram, WhatsApp o el QR de la vidriera. Los QR de las mesas abren siempre la carta directo."
           />
           <div className="flex flex-wrap items-center gap-2 rounded-xl bg-bg px-3 py-2 text-sm">
             <span className="text-muted">Para tu Instagram o WhatsApp:</span>
@@ -89,7 +89,7 @@ export function LinksForm({
             )}
           </div>
           <p className="text-xs text-muted">
-            El QR del local es para la vidriera, el mostrador o folletos: abre esta página (o la carta, si la apagás). Los QR de cada mesa siguen en Mesas.
+            El QR del local es para la vidriera, el mostrador o folletos: abre esta página (o la carta, si la apagás). Los QR de cada mesa están en Mesas y abren la carta de esa mesa.
           </p>
           {qr && <QrDialog path={`/${slug}/enlaces`} title={venue.name} venue={venue.name} caption="Escaneá para ver la carta, redes y más" onClose={() => setQr(false)} />}
         </Card>

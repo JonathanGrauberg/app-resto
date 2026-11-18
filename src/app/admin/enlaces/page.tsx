@@ -10,7 +10,7 @@ import { LinksForm } from "./links-form";
 
 export const metadata: Metadata = { title: "Enlaces" };
 
-/** Página de enlaces del local (tipo Linktree): lo primero que se ve al escanear el QR. */
+/** Página de enlaces del local (tipo Linktree): para Instagram, WhatsApp o el QR de la vidriera. */
 export default async function AdminLinksPage() {
   const { tenant } = await requireTenantRole(ADMIN_ROLES);
   const [s, hasBooking, base] = await Promise.all([
@@ -23,7 +23,7 @@ export default async function AdminLinksPage() {
     <>
       <PageHeader
         title="Enlaces"
-        description="Tu página con la carta, redes, reseñas y cómo llegar. Se ve al escanear el QR de la mesa y la podés compartir en tu Instagram."
+        description="Tu página con la carta, redes, reseñas y cómo llegar. Compartila en tu Instagram o WhatsApp, o poné su QR en la vidriera."
       />
       <LinksForm
         initial={{ enabled: s?.linksEnabled ?? false, theme: s && isLinkTheme(s.linksTheme) ? s.linksTheme : "dark", links: readLinks(s, hasBooking) }}

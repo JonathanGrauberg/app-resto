@@ -48,5 +48,5 @@ export async function saveLinks(_: ActionState, formData: FormData): Promise<Act
   });
   revalidatePath("/admin/enlaces");
   revalidatePath(`/${tenant.slug}`, "layout");
-  return success(linksEnabled ? "Guardado: al escanear el QR se ve primero esta página" : "Guardado (la página está apagada)");
+  return success(linksEnabled ? "Guardado: tu página de enlaces está activa" : "Guardado (la página está apagada)");
 }
