@@ -13,8 +13,8 @@ export function LoginForm({ next }: { next?: string }) {
     <form onSubmit={action} className="space-y-4">
       {next && <input type="hidden" name="next" value={next} />}
       <div>
-        <Label htmlFor="email">Email</Label>
-        <Input id="email" name="email" type="email" autoComplete="email" required />
+        <Label htmlFor="email">Email o usuario</Label>
+        <Input id="email" name="email" type="text" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} required />
       </div>
       <div>
         <Label htmlFor="password">Contraseña</Label>

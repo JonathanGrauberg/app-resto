@@ -3,9 +3,9 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { currentDevice, lockMinutesLeft, pairWithStaffPassword, registerPinFailure, registerPinSuccess, LOCK_MINUTES } from "@/lib/auth/devices";
+import { currentDevice, forgetThisDevice, loginStaffAccount, lockMinutesLeft, registerPinFailure, registerPinSuccess, LOCK_MINUTES } from "@/lib/auth/devices";
 import { verifySecret } from "@/lib/auth/password";
-import { createSession, destroySession } from "@/lib/auth/session";
+import { createSession, destroySession, getSession } from "@/lib/auth/session";
 import { ADMIN_ROLES, hasRole, staffHome } from "@/lib/auth/permissions";
 import { redeemProCode } from "@/lib/pro";
 
@@ -25,6 +25,14 @@ function safeNext(next?: string) {
 }
 
 export async function loginWithPassword(_: LoginState, formData: FormData): Promise<LoginState> {
+  // Sin "@": es la cuenta del personal del local (usuario + clave) → habilita este equipo y pide el PIN.
+  const id = String(formData.get("email") ?? "").trim();
+  if (id && !id.includes("@")) {
+    const r = await loginStaffAccount(id, String(formData.get("password") ?? ""));
+    if ("error" in r) return { error: r.error };
+    redirect(`/login/pin/${r.slug}`);
+  }
+
   const parsed = credentials.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
   const { email, password, next, code } = parsed.data;
@@ -63,62 +71,68 @@ export async function loginWithPassword(_: LoginState, formData: FormData): Prom
 
 const pinSchema = z.object({
   slug: z.string(),
-  membershipId: z.string().min(1, "Elegí tu usuario"),
   pin: z.string().regex(/^\d{4,6}$/, "El PIN tiene 4 a 6 dígitos"),
 });
 
+/** Solo el PIN: identifica a la persona dentro del local (los PIN no se repiten en un local). */
 export async function loginWithPin(_: LoginState, formData: FormData): Promise<LoginState> {
   const parsed = pinSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
-  const { slug, membershipId, pin } = parsed.data;
+  const { slug, pin } = parsed.data;
 
-  const membership = await db.membership.findFirst({
-    where: { id: membershipId, active: true, tenant: { slug, active: true } },
-  });
-  if (!membership) return { error: "PIN incorrecto" };
+  const tenant = await db.tenant.findUnique({ where: { slug }, select: { id: true, active: true } });
+  if (!tenant?.active) return { error: "PIN incorrecto" };
 
-  // El PIN solo vale desde un equipo vinculado por el admin.
-  const device = await currentDevice(membership.tenantId);
-  if (!device) return { error: "Este equipo no está vinculado. Pedile al encargado el QR de acceso del personal." };
+  // El PIN vale en equipos donde se entró con la cuenta del personal.
+  const device = await currentDevice(tenant.id);
+  if (!device) return { error: "Primero entrá con la cuenta del personal en este equipo." };
 
-  const locked = await lockMinutesLeft(device.id, membership.id);
+  const locked = await lockMinutesLeft(device.id);
   if (locked) return { error: `Demasiados intentos. Probá de nuevo en ${locked === 1 ? "1 minuto" : `${locked} minutos`}.` };
 
-  if (!(await verifySecret(pin, membership.pinHash))) {
-    const left = await registerPinFailure(device.id, membership.id);
-    if (left === 0) return { error: `Demasiados intentos: quedó bloqueado ${LOCK_MINUTES} minutos en este equipo. Le avisamos al encargado.` };
-    return { error: left <= 2 ? `PIN incorrecto. Te ${left === 1 ? "queda 1 intento" : `quedan ${left} intentos`}.` : "PIN incorrecto" };
+  const people = await db.membership.findMany({
+    where: { tenantId: tenant.id, active: true, pinHash: { not: null } },
+    select: { id: true, userId: true, role: true, pinHash: true },
+  });
+  let match: (typeof people)[number] | undefined;
+  for (const m of people) {
+    if (await verifySecret(pin, m.pinHash)) {
+      match = m;
+      break;
+    }
+  }
+  if (!match) {
+    const left = await registerPinFailure(device.id);
+    if (left === 0) return { error: `Demasiados intentos: esperá ${LOCK_MINUTES} minutos.` };
+    return { error: "PIN incorrecto" };
   }
 
-  await registerPinSuccess(device.id, membership.id);
+  await registerPinSuccess(device.id);
+  await destroySession();
   await createSession({
-    userId: membership.userId,
-    tenantId: membership.tenantId,
-    membershipId: membership.id,
+    userId: match.userId,
+    tenantId: tenant.id,
+    membershipId: match.id,
     deviceId: device.id,
     kind: "pin",
   });
 
-  redirect(staffHome(membership.role));
+  redirect(staffHome(match.role));
 }
 
-const venueSchema = z.object({
-  slug: z.string().trim().min(1, "Escribí el usuario del local").max(60),
-  password: z.string().min(1, "Escribí la clave del local").max(100),
-  name: z.string().trim().max(40).optional(),
-});
-
-/** Usuario del local + clave del local: vincula este equipo y pasa a elegir persona y PIN. */
-export async function loginWithVenue(_: LoginState, formData: FormData): Promise<LoginState> {
-  const parsed = venueSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message };
-  const { slug, password, name } = parsed.data;
-  const r = await pairWithStaffPassword(slug, password, name && name.length >= 2 ? name : "Equipo del personal");
-  if ("error" in r) return { error: r.error };
-  redirect(`/login/pin/${r.slug}`);
-}
-
+/** Salir: en un equipo del local vuelve a la pantalla del PIN (para que entre el siguiente). */
 export async function logout() {
+  const session = await getSession();
   await destroySession();
+  const tenant = session?.tenant;
+  if (tenant && (await currentDevice(tenant.id))) redirect(`/login/pin/${tenant.slug}`);
+  redirect("/login");
+}
+
+/** "Salir de este local en este equipo": vuelve a pedir la cuenta del personal. */
+export async function leaveVenue(slug: string) {
+  const tenant = await db.tenant.findUnique({ where: { slug }, select: { id: true } });
+  await destroySession();
+  if (tenant) await forgetThisDevice(tenant.id);
   redirect("/login");
 }

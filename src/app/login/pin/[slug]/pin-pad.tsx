@@ -1,73 +1,62 @@
 "use client";
 
-import { useActionState, useState, type ComponentProps } from "react";
+import { useActionState, useEffect, useRef, useState, type ComponentProps } from "react";
 import { Delete } from "lucide-react";
+import { Photo } from "@/components/mock-image";
 import { Card } from "@/components/ui/card";
 import { FormError } from "@/components/ui/field";
 import { cn } from "@/lib/format";
-import { loginWithPin } from "../../actions";
+import { leaveVenue, loginWithPin } from "../../actions";
 
-type Person = { id: string; name: string; roleLabel: string };
-
-export function PinPad({ slug, people }: { slug: string; people: Person[] }) {
+/**
+ * Solo el PIN: se escribe con los botones o con el teclado de la compu (números, borrar, Enter).
+ * El PIN dice quién entra (dueño, mozo, cocina…); no hace falta elegir la persona.
+ */
+export function PinPad({ slug, venue, logoUrl }: { slug: string; venue: string; logoUrl: string | null }) {
   const [state, action, pending] = useActionState(loginWithPin, undefined);
-  const [selected, setSelected] = useState<string | null>(null);
   const [pin, setPin] = useState("");
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // Tras un PIN incorrecto se limpia para escribir de nuevo (ajuste de estado durante el render).
+  const [seen, setSeen] = useState(state);
+  if (state !== seen) {
+    setSeen(state);
+    if (state?.error) setPin("");
+  }
 
   const press = (d: string) => setPin((p) => (p.length < 6 ? p + d : p));
 
-  if (!selected) {
-    return (
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {people.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => setSelected(p.id)}
-            className="rounded-2xl border border-line bg-surface p-4 text-left transition-colors hover:border-brand"
-          >
-            <span className="mb-3 flex size-10 items-center justify-center rounded-full bg-brand-soft font-semibold text-brand">
-              {p.name.charAt(0)}
-            </span>
-            <span className="block font-medium leading-tight">{p.name}</span>
-            <span className="text-xs text-muted">{p.roleLabel}</span>
-          </button>
-        ))}
-      </div>
-    );
-  }
-
-  const person = people.find((p) => p.id === selected)!;
+  // Teclado físico (compu del local): números, Backspace, Escape y Enter.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (/^\d$/.test(e.key)) press(e.key);
+      else if (e.key === "Backspace") setPin((p) => p.slice(0, -1));
+      else if (e.key === "Escape") setPin("");
+      // Se envía en el próximo tick, cuando ya se dibujó el último dígito tecleado.
+      else if (e.key === "Enter") setTimeout(() => formRef.current?.requestSubmit(), 0);
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   return (
     <Card className="p-5">
-      <form action={action} className="space-y-5">
+      <form ref={formRef} action={action} className="space-y-5">
         <input type="hidden" name="slug" value={slug} />
-        <input type="hidden" name="membershipId" value={selected} />
         <input type="hidden" name="pin" value={pin} />
 
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="font-medium">{person.name}</p>
-            <p className="text-xs text-muted">{person.roleLabel}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setSelected(null);
-              setPin("");
-            }}
-            className="text-sm text-brand"
-          >
-            Cambiar
-          </button>
+        <div className="flex flex-col items-center text-center">
+          <Photo src={logoUrl} seed={slug} kind="kitchen" label={`Logo de ${venue}`} className="size-14 rounded-2xl ring-1 ring-ink/10" />
+          <p className="mt-3 text-lg font-semibold">{venue}</p>
+          <p className="text-sm text-muted">Ingresá tu PIN</p>
         </div>
 
         <div className="flex justify-center gap-3" aria-label={`${pin.length} dígitos ingresados`}>
           {Array.from({ length: Math.max(4, pin.length) }).map((_, i) => (
-            <span
-              key={i}
-              className={cn("size-4 rounded-full border-2 border-ink/30", i < pin.length && "border-brand bg-brand")}
-            />
+            <span key={i} className={cn("size-4 rounded-full border-2 border-ink/30", i < pin.length && "border-brand bg-brand")} />
           ))}
         </div>
 
@@ -96,6 +85,10 @@ export function PinPad({ slug, people }: { slug: string; people: Person[] }) {
           {pending ? "Entrando…" : "Entrar"}
         </button>
       </form>
+
+      <form action={leaveVenue.bind(null, slug)} className="mt-4 text-center">
+        <button className="text-xs text-muted hover:text-ink">Salir de {venue} en este equipo</button>
+      </form>
     </Card>
   );
 }
@@ -104,10 +97,7 @@ function PadKey({ className, ...props }: ComponentProps<"button">) {
   return (
     <button
       type="button"
-      className={cn(
-        "flex h-14 items-center justify-center rounded-xl bg-bg text-xl font-medium active:bg-ink/10",
-        className,
-      )}
+      className={cn("flex h-14 items-center justify-center rounded-xl bg-bg text-xl font-medium active:bg-ink/10", className)}
       {...props}
     />
   );

@@ -8,7 +8,7 @@ import { NotPaired } from "./not-paired";
 
 export const metadata: Metadata = { title: "Entrar con PIN" };
 
-/** Entrada con PIN: va directo al local al que está vinculado este equipo. Sin equipo vinculado, no hay PIN. */
+/** Entrada con PIN: va directo al local de este equipo. Si acá no se entró con la cuenta del personal, se pide primero. */
 export default async function PinTenantPage() {
   const venues = await pairedTenants();
   if (venues.length === 1) redirect(`/login/pin/${venues[0].slug}`);

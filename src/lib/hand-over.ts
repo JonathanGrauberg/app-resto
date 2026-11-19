@@ -48,8 +48,8 @@ export async function handOverTenant(tenantId: string, o: HandOverOptions) {
       await tx.devicePairing.deleteMany({ where });
       await tx.staffDevice.deleteMany({ where });
       await tx.authSession.deleteMany({ where });
-      // La clave del local la eligieron ustedes para la demo: el dueño crea la suya.
-      await tx.tenantSettings.updateMany({ where, data: { staffPasswordHash: null } });
+      // La cuenta del personal la crearon ustedes para la demo: el dueño arma la suya.
+      await tx.tenantSettings.updateMany({ where, data: { staffUsername: null, staffPasswordHash: null } });
       await tx.staffLoginLock.deleteMany({ where });
 
       // 3) Lo que se elige no conservar.

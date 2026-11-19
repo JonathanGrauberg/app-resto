@@ -6,10 +6,13 @@ import { ButtonLink } from "@/components/ui/button";
 import { Badge, Card } from "@/components/ui/card";
 import { FormSuccess } from "@/components/ui/field";
 import { devicesOf } from "@/lib/auth/devices";
+import { baseUrl } from "@/lib/base-url";
+import { db } from "@/lib/db";
 import { requireTenantRole } from "@/lib/auth/guards";
 import { ADMIN_ROLES, ROLE_LABEL, ROLE_ORDER, canManageRoles, hasRole, rolesOf, sortRoles } from "@/lib/auth/permissions";
 import { cn } from "@/lib/format";
 import { tableLabelOf } from "@/lib/table-session";
+import { StaffAccountCard } from "./staff-account-card";
 
 export const metadata: Metadata = { title: "Personal" };
 
@@ -17,7 +20,7 @@ export default async function AdminPersonalPage({ searchParams }: PageProps<"/ad
   const { tdb, tenant, membership: me } = await requireTenantRole(ADMIN_ROLES);
   const { ok } = await searchParams;
 
-  const [members, open, devices] = await Promise.all([
+  const [members, open, devices, staffAccount] = await Promise.all([
     tdb.membership.findMany({ include: { user: { select: { name: true, email: true, passwordHash: true } } } }),
     // Mesas abiertas con mozo: para mostrar quién está libre.
     tdb.tableSession.findMany({
@@ -25,7 +28,9 @@ export default async function AdminPersonalPage({ searchParams }: PageProps<"/ad
       include: { table: { select: { number: true, groupId: true } } },
     }),
     devicesOf(tenant.id),
+    db.tenantSettings.findUnique({ where: { tenantId: tenant.id }, select: { staffUsername: true, staffPasswordHash: true } }),
   ]);
+  const base = (await baseUrl()).replace(/^https?:\/\//, "");
   const locks = devices.reduce((n, d) => n + d.pinLocks.length, 0);
   const tablesOf = new Map<string, string[]>();
   for (const s of open) {
@@ -44,7 +49,7 @@ export default async function AdminPersonalPage({ searchParams }: PageProps<"/ad
     <>
       <PageHeader
         title="Personal"
-        description="Mozos, cocina y bar entran con su PIN desde los equipos vinculados del local."
+        description="En las compus y tablets del local se entra con la cuenta del personal y después cada uno pone su PIN. Así se sabe quién cargó cada cosa."
         actions={
           <div className="flex flex-wrap gap-2">
             <ButtonLink href="/admin/personal/equipos" variant="secondary">
@@ -59,15 +64,15 @@ export default async function AdminPersonalPage({ searchParams }: PageProps<"/ad
       {locks > 0 && (
         <Link href="/admin/personal/equipos" className="mb-4 flex items-center gap-2 rounded-xl bg-danger-soft px-4 py-3 text-sm font-medium text-danger">
           <ShieldAlert className="size-4 shrink-0" aria-hidden />
-          {locks === 1 ? "Hubo un bloqueo" : `Hubo ${locks} bloqueos`} por PIN incorrectos en las últimas 24 h. Ver equipos
+          {locks === 1 ? "Hubo un bloqueo" : `Hubo ${locks} bloqueos`} de muchos PIN incorrectos seguidos en las últimas 24 h. Ver equipos
         </Link>
       )}
-      {devices.length === 0 && (
-        <Link href="/admin/personal/equipos" className="mb-4 flex items-center gap-2 rounded-xl bg-warn-soft px-4 py-3 text-sm font-medium text-warn">
-          <Smartphone className="size-4 shrink-0" aria-hidden />
-          Todavía no vinculaste ningún equipo: sin eso, nadie puede entrar con PIN. Vincular ahora
-        </Link>
-      )}
+      <StaffAccountCard
+        username={staffAccount?.staffUsername ?? null}
+        hasPassword={!!staffAccount?.staffPasswordHash}
+        suggested={`personal.${tenant.slug}`.slice(0, 30)}
+        loginUrl={`${base}/login`}
+      />
       {typeof ok === "string" && (
         <div className="mb-6">
           <FormSuccess message={ok} />
