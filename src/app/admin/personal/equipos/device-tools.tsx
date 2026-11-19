@@ -1,12 +1,12 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
-import { QrCode, Trash2 } from "lucide-react";
+import { Check, Copy, KeyRound, QrCode, Trash2 } from "lucide-react";
 import { QrDialog } from "@/components/qr-dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Field, FormError, FormSuccess, Input } from "@/components/ui/field";
-import { newPairing, pairHere, removeDevice } from "./actions";
+import { Field, FormError, FormSuccess, Input, Switch } from "@/components/ui/field";
+import { newPairing, pairHere, removeDevice, removeStaffPassword, saveStaffPassword } from "./actions";
 
 /** Botón que genera el QR de vinculación y lo muestra en grande. */
 export function PairQrButton({ venue, minutes }: { venue: string; minutes: number }) {
@@ -68,5 +68,107 @@ export function RemoveDeviceButton({ id, name }: { id: string; name: string }) {
     >
       <Trash2 className="size-4" aria-hidden /> Quitar
     </Button>
+  );
+}
+
+/**
+ * Usuario y clave del local: el personal entra una vez con esto en su equipo y después solo con PIN.
+ * El usuario es el código del local; la clave la elige el encargado.
+ */
+export function StaffPasswordCard({ slug, hasPassword, loginUrl }: { slug: string; hasPassword: boolean; loginUrl: string }) {
+  const [state, action, pending] = useActionState(saveStaffPassword, undefined);
+  const [editing, setEditing] = useState(!hasPassword);
+  const [copied, setCopied] = useState(false);
+  const [removing, startRemove] = useTransition();
+  // Al guardar con éxito se cierra el formulario (ajuste de estado durante el render).
+  const [handled, setHandled] = useState<typeof state>(undefined);
+  if (state !== handled) {
+    setHandled(state);
+    if (state?.ok) setEditing(false);
+  }
+
+  return (
+    <Card className="space-y-4 p-4 sm:p-5">
+      <div className="flex items-start gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
+          <KeyRound className="size-5" aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="font-medium">Usuario y clave del local</p>
+          <p className="text-sm text-muted">
+            Lo más simple: cada uno entra una vez desde su celular en <strong>{loginUrl}</strong> con estos datos, y desde ahí entra solo con su PIN.
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 rounded-xl bg-bg px-3 py-2 text-sm">
+        <span className="text-muted">Usuario del local:</span>
+        <code className="font-semibold">{slug}</code>
+        <button
+          type="button"
+          onClick={() => {
+            navigator.clipboard.writeText(slug).then(() => {
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            });
+          }}
+          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-brand hover:bg-brand-soft"
+        >
+          {copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />} {copied ? "Copiado" : "Copiar"}
+        </button>
+        <span className="ml-auto text-muted">Clave: {hasPassword ? "creada" : "sin crear"}</span>
+      </div>
+
+      {editing ? (
+        <form action={action} className="space-y-3">
+          <Field
+            label={hasPassword ? "Nueva clave del local" : "Clave del local"}
+            htmlFor="staff-password"
+            hint="Mínimo 6 caracteres. Es para el equipo, no para una persona: cada uno sigue entrando con su PIN."
+          >
+            <Input id="staff-password" name="password" required minLength={6} maxLength={100} autoComplete="new-password" />
+          </Field>
+          {hasPassword && (
+            <Switch
+              name="unpairAll"
+              label="Desvincular todos los equipos"
+              description="Si se fue alguien del personal: todos vuelven a entrar con la clave nueva."
+            />
+          )}
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" disabled={pending}>
+              {pending ? "Guardando…" : "Guardar clave"}
+            </Button>
+            {hasPassword && (
+              <Button type="button" variant="ghost" onClick={() => setEditing(false)}>
+                Cancelar
+              </Button>
+            )}
+          </div>
+        </form>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => setEditing(true)}>
+            Cambiar clave
+          </Button>
+          <Button
+            variant="ghost"
+            className="text-danger"
+            disabled={removing}
+            onClick={() => {
+              if (confirm("¿Quitar la clave del local? Los equipos ya vinculados siguen andando; los nuevos solo se van a poder sumar con el QR.")) {
+                startRemove(() => removeStaffPassword());
+              }
+            }}
+          >
+            Quitar clave
+          </Button>
+        </div>
+      )}
+      <div className="empty:hidden">
+        <FormError message={state?.error} />
+        <FormSuccess message={state?.ok} />
+      </div>
+    </Card>
   );
 }

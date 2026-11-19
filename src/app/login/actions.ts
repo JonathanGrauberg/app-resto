@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { currentDevice, lockMinutesLeft, registerPinFailure, registerPinSuccess, LOCK_MINUTES } from "@/lib/auth/devices";
+import { currentDevice, lockMinutesLeft, pairWithStaffPassword, registerPinFailure, registerPinSuccess, LOCK_MINUTES } from "@/lib/auth/devices";
 import { verifySecret } from "@/lib/auth/password";
 import { createSession, destroySession } from "@/lib/auth/session";
 import { ADMIN_ROLES, hasRole, staffHome } from "@/lib/auth/permissions";
@@ -100,6 +100,22 @@ export async function loginWithPin(_: LoginState, formData: FormData): Promise<L
   });
 
   redirect(staffHome(membership.role));
+}
+
+const venueSchema = z.object({
+  slug: z.string().trim().min(1, "Escribí el usuario del local").max(60),
+  password: z.string().min(1, "Escribí la clave del local").max(100),
+  name: z.string().trim().max(40).optional(),
+});
+
+/** Usuario del local + clave del local: vincula este equipo y pasa a elegir persona y PIN. */
+export async function loginWithVenue(_: LoginState, formData: FormData): Promise<LoginState> {
+  const parsed = venueSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message };
+  const { slug, password, name } = parsed.data;
+  const r = await pairWithStaffPassword(slug, password, name && name.length >= 2 ? name : "Equipo del personal");
+  if ("error" in r) return { error: r.error };
+  redirect(`/login/pin/${r.slug}`);
 }
 
 export async function logout() {

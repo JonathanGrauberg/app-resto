@@ -8,7 +8,8 @@ import { requireTenantRole } from "@/lib/auth/guards";
 import { ADMIN_ROLES } from "@/lib/auth/permissions";
 import { db } from "@/lib/db";
 import { regionOf } from "@/lib/region";
-import { PairHereForm, PairQrButton, RemoveDeviceButton } from "./device-tools";
+import { baseUrl } from "@/lib/base-url";
+import { PairHereForm, PairQrButton, RemoveDeviceButton, StaffPasswordCard } from "./device-tools";
 
 export const metadata: Metadata = { title: "Equipos" };
 
@@ -18,10 +19,11 @@ export default async function DevicesPage() {
   const [devices, here, settings, members] = await Promise.all([
     devicesOf(tenant.id),
     currentDevice(tenant.id),
-    db.tenantSettings.findUnique({ where: { tenantId: tenant.id }, select: { country: true, timezone: true, locale: true, currency: true } }),
+    db.tenantSettings.findUnique({ where: { tenantId: tenant.id }, select: { country: true, timezone: true, locale: true, currency: true, staffPasswordHash: true } }),
     db.membership.findMany({ where: { tenantId: tenant.id }, select: { id: true, user: { select: { name: true } } } }),
   ]);
   const region = regionOf(settings);
+  const base = await baseUrl();
   const nameOf = new Map(members.map((m) => [m.id, m.user.name]));
   const fmt = new Intl.DateTimeFormat(region.locale, { timeZone: region.timezone, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 
@@ -29,7 +31,7 @@ export default async function DevicesPage() {
     <>
       <PageHeader
         title="Equipos"
-        description="El personal entra con PIN solo desde estos celulares, tablets o compus. Así, aunque alguien adivine un PIN, no puede entrar desde otro lado."
+        description="El personal entra con PIN solo desde estos celulares, tablets o compus. Un equipo se suma entrando una vez con el usuario y la clave del local, o escaneando el QR."
         actions={
           <ButtonLink href="/admin/personal" variant="secondary">
             <ArrowLeft className="size-4" aria-hidden /> Personal
@@ -38,9 +40,11 @@ export default async function DevicesPage() {
       />
 
       <div className="space-y-4">
+        <StaffPasswordCard slug={tenant.slug} hasPassword={!!settings?.staffPasswordHash} loginUrl={`${base.replace(/^https?:\/\//, "")}/login/pin`} />
+
         <Card className="flex flex-wrap items-center gap-3 p-4 sm:p-5">
           <div className="min-w-56 flex-1">
-            <p className="font-medium">Vincular un celular o tablet</p>
+            <p className="font-medium">O con un QR</p>
             <p className="text-sm text-muted">Mostrá el QR y que lo escaneen con el equipo. Se hace una sola vez por equipo.</p>
           </div>
           <PairQrButton venue={tenant.name} minutes={PAIRING_MINUTES} />

@@ -1,12 +1,15 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { hashSecret, verifySecret } from "@/lib/auth/password";
 import { db } from "@/lib/db";
 
 /**
  * Equipos vinculados para entrar con PIN.
  * El código del local es público (está en la URL de la carta), así que el PIN solo sirve
- * desde un equipo que el admin autorizó: equipo + PIN. Cada equipo guarda un token en una cookie por local.
+ * desde un equipo autorizado: equipo + PIN. Cada equipo guarda un token en una cookie por local.
+ * Un equipo se autoriza con el QR que muestra el admin, o entrando una vez con el usuario
+ * del local (su código) y la clave del local.
  */
 
 const COOKIE_PREFIX = "yd_";
@@ -15,6 +18,10 @@ export const PAIRING_MINUTES = 10;
 /** PIN incorrectos seguidos antes de bloquear a esa persona en ese equipo. */
 export const MAX_PIN_FAILURES = 5;
 export const LOCK_MINUTES = 10;
+/** Claves del local incorrectas desde una misma IP antes de bloquear. */
+export const MAX_STAFF_PASSWORD_FAILURES = 10;
+export const STAFF_PASSWORD_LOCK_MINUTES = 15;
+export const STAFF_PASSWORD_MIN = 6;
 
 const MINUTE = 60_000;
 /** Los navegadores limitan las cookies a ~400 días. */
@@ -149,4 +156,75 @@ export async function devicesOf(tenantId: string) {
     include: { pinLocks: { where: { lockedAt: { gt: since } }, orderBy: { lockedAt: "desc" } } },
     orderBy: { createdAt: "asc" },
   });
+}
+
+// ─────────────────────────────────────────────────────────────
+// Clave del local
+// ─────────────────────────────────────────────────────────────
+
+async function clientIpHash() {
+  const h = await headers();
+  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
+  return hash(ip);
+}
+
+/** Guarda (o cambia) la clave del local. Con `unpairAll`, desvincula todos los equipos (ej. se fue alguien). */
+export async function setStaffPassword(tenantId: string, password: string, unpairAll: boolean) {
+  const staffPasswordHash = await hashSecret(password);
+  await db.tenantSettings.update({ where: { tenantId }, data: { staffPasswordHash } });
+  if (unpairAll) {
+    const devices = await db.staffDevice.findMany({ where: { tenantId, revokedAt: null }, select: { id: true } });
+    for (const d of devices) await revokeDevice(tenantId, d.id);
+  }
+  await db.staffLoginLock.deleteMany({ where: { tenantId } });
+}
+
+export async function clearStaffPassword(tenantId: string) {
+  await db.tenantSettings.update({ where: { tenantId }, data: { staffPasswordHash: null } });
+}
+
+/**
+ * Usuario del local + clave del local: si son correctos, vincula este equipo.
+ * Mensajes genéricos para no revelar qué locales existen; bloqueo por IP ante muchos intentos.
+ */
+export async function pairWithStaffPassword(slug: string, password: string, name: string) {
+  const generic = { error: "Usuario o clave del local incorrectos" } as const;
+  const tenant = await db.tenant.findUnique({
+    where: { slug: slug.trim().toLowerCase() },
+    select: { id: true, slug: true, active: true, settings: { select: { staffPasswordHash: true } } },
+  });
+  if (!tenant || !tenant.active) return generic;
+
+  const ipHash = await clientIpHash();
+  const key = { tenantId_ipHash: { tenantId: tenant.id, ipHash } };
+  const lock = await db.staffLoginLock.findUnique({ where: key });
+  const left = lock?.lockedUntil ? lock.lockedUntil.getTime() - Date.now() : 0;
+  if (left > 0) {
+    const m = Math.ceil(left / MINUTE);
+    return { error: `Demasiados intentos. Probá de nuevo en ${m === 1 ? "1 minuto" : `${m} minutos`}.` } as const;
+  }
+
+  const stored = tenant.settings?.staffPasswordHash;
+  if (!stored) return { error: "Este local todavía no tiene clave del personal. El encargado la crea en Personal → Equipos." } as const;
+
+  if (!(await verifySecret(password, stored))) {
+    const l = await db.staffLoginLock.upsert({
+      where: key,
+      create: { tenantId: tenant.id, ipHash, failures: 1 },
+      update: { failures: { increment: 1 } },
+    });
+    if (l.failures >= MAX_STAFF_PASSWORD_FAILURES) {
+      await db.staffLoginLock.update({
+        where: key,
+        data: { failures: 0, lockedUntil: new Date(Date.now() + STAFF_PASSWORD_LOCK_MINUTES * MINUTE) },
+      });
+      return { error: `Demasiados intentos: probá de nuevo en ${STAFF_PASSWORD_LOCK_MINUTES} minutos.` } as const;
+    }
+    return generic;
+  }
+
+  await db.staffLoginLock.deleteMany({ where: { tenantId: tenant.id, ipHash } });
+  // Si este navegador ya estaba vinculado, se reutiliza ese equipo.
+  if (!(await currentDevice(tenant.id))) await createDevice(tenant.id, name);
+  return { slug: tenant.slug } as const;
 }

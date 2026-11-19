@@ -2,9 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { fail, success, type ActionState } from "@/lib/actions";
+import { checkbox, fail, success, type ActionState } from "@/lib/actions";
 import { requireTenantRole } from "@/lib/auth/guards";
-import { createPairing, pairThisDevice, revokeDevice } from "@/lib/auth/devices";
+import { clearStaffPassword, createPairing, pairThisDevice, revokeDevice, setStaffPassword, STAFF_PASSWORD_MIN } from "@/lib/auth/devices";
 import { ADMIN_ROLES } from "@/lib/auth/permissions";
 
 const PATH = "/admin/personal/equipos";
@@ -29,5 +29,26 @@ export async function pairHere(_: ActionState, formData: FormData): Promise<Acti
 export async function removeDevice(deviceId: string) {
   const { tenant } = await requireTenantRole(ADMIN_ROLES);
   await revokeDevice(tenant.id, deviceId);
+  revalidatePath(PATH);
+}
+
+const staffPasswordSchema = z.object({
+  password: z.string().min(STAFF_PASSWORD_MIN, `Mínimo ${STAFF_PASSWORD_MIN} caracteres`).max(100),
+  unpairAll: checkbox,
+});
+
+/** Crea o cambia la clave del local (usuario del local + esta clave → el equipo queda listo para PIN). */
+export async function saveStaffPassword(_: ActionState, formData: FormData): Promise<ActionState> {
+  const { tenant } = await requireTenantRole(ADMIN_ROLES);
+  const parsed = staffPasswordSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return fail(parsed.error);
+  await setStaffPassword(tenant.id, parsed.data.password, parsed.data.unpairAll);
+  revalidatePath(PATH);
+  return success(parsed.data.unpairAll ? "Clave guardada. Se desvincularon todos los equipos." : "Clave guardada.");
+}
+
+export async function removeStaffPassword() {
+  const { tenant } = await requireTenantRole(ADMIN_ROLES);
+  await clearStaffPassword(tenant.id);
   revalidatePath(PATH);
 }

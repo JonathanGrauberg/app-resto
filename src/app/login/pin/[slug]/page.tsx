@@ -15,7 +15,7 @@ export default async function PinLoginPage({ params }: PageProps<"/login/pin/[sl
 
   // Sin equipo vinculado no se muestra ni la lista del personal.
   const device = await currentDevice(tenant.id);
-  if (!device) return <NotPaired venue={tenant.name} />;
+  if (!device) return <NotPaired venue={tenant.name} slug={tenant.slug} />;
 
   const memberships = await db.membership.findMany({
     where: { tenantId: tenant.id, active: true, pinHash: { not: null } },

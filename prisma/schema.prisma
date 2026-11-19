@@ -58,6 +58,7 @@ model Tenant {
   notifications  Notification[]
   translations   Translation[]
   modifierGroups ModifierGroup[]
+  staffLoginLocks StaffLoginLock[]
   subscription   Subscription?
   billingPayments BillingPayment[]
   cartItems      CartItem[]
@@ -94,6 +95,8 @@ model TenantSettings {
   facebookUrl     String?
   websiteUrl      String?
   googleReviewUrl String?
+  /// Clave del local: con el usuario del local (su código) + esta clave, un equipo queda vinculado para entrar con PIN.
+  staffPasswordHash String?
   /// Página de enlaces (tipo Linktree) que se ve antes de la carta al escanear el QR de la mesa.
   linksEnabled    Boolean   @default(false)
   /// Fondo: "dark" | "green" | "cream" | "sand" | "cover" (la portada del local, oscurecida).
@@ -241,6 +244,19 @@ model DevicePairing {
   createdAt DateTime  @default(now())
 
   @@index([tenantId])
+}
+
+/// Claves del local incorrectas desde una misma conexión (IP). A las 10 se bloquea un rato.
+model StaffLoginLock {
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  /// sha256 de la IP.
+  ipHash      String
+  failures    Int       @default(0)
+  lockedUntil DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  @@id([tenantId, ipHash])
 }
 
 /// PIN incorrectos de una persona en un equipo. A los 5 se bloquea un rato.
